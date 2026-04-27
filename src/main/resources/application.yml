@@ -4,3 +4,9 @@ server:
 spring:
   application:
     name: fireworks
+  main:
+    allow-bean-definition-overriding: true
+
+app:
+  database:
+    url: jdbc:sqlite:src/main/resources/fireworks-test.db
