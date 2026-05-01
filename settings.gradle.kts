@@ -6,3 +6,5 @@ pluginManagement {
 }
 
 rootProject.name = "fireworks"
+include("fireworks-server")
+include("fireworks-web")
