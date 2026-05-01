@@ -33,8 +33,11 @@ dependencies {
     implementation("org.ktorm:ktorm-core:4.1.1")
     implementation("org.ktorm:ktorm-support-sqlite:4.1.1")
 
+    implementation("org.springframework.security:spring-security-crypto")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

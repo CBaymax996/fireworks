@@ -106,7 +106,11 @@ private fun UpdateUserRequest.validate() {
 enum class ErrorCode {
     USER_NOT_FOUND,
     INVALID_REQUEST,
-    INTERNAL_ERROR
+    INTERNAL_ERROR,
+    VAULT_NOT_INITIALIZED,
+    NOT_AUTHENTICATED,
+    INVALID_CREDENTIALS,
+    ENTRY_NOT_FOUND
 }
 
 class AppException(

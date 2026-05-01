@@ -4,7 +4,9 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
+import site.hanabii.fireworks.infra.PasswordEntryDO
 import site.hanabii.fireworks.infra.UserDO
+import site.hanabii.fireworks.infra.VaultConfigDO
 import javax.sql.DataSource
 
 /**
@@ -20,7 +22,11 @@ class SchemaInitializer(
     fun init() {
         if (!enabled) return
         dataSource.connection.use { conn ->
-            conn.createStatement().use { it.execute(UserDO.DDL.trimIndent()) }
+            conn.createStatement().use { stmt ->
+                stmt.execute(UserDO.DDL.trimIndent())
+                stmt.execute(VaultConfigDO.DDL.trimIndent())
+                stmt.execute(PasswordEntryDO.DDL.trimIndent())
+            }
         }
     }
 }

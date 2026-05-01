@@ -17,6 +17,13 @@ import site.hanabii.fireworks.domain.UserRepository
 /**
  * 基于 Ktorm + SQLite 的 UserRepository 实现。
  */
+/**
+ * 用户仓储实现。
+ *
+ * 使用 Ktorm DSL 操作 SQLite，save 区分 insert / update：
+ * - id 为 null 时插入，按 username 回查以获取自增主键
+ * - id 不为 null 时直接更新
+ */
 @Repository
 class UserRepositoryImpl(
     private val database: Database

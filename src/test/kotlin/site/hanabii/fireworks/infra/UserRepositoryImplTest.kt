@@ -10,6 +10,11 @@ import site.hanabii.fireworks.domain.User
 import site.hanabii.fireworks.domain.UserRepository
 import java.time.Instant
 
+/**
+ * 用户仓储集成测试。
+ *
+ * 覆盖：save（insert / update）、findById、findAll、count、deleteById。
+ */
 @SpringBootTest
 class UserRepositoryImplTest(
     @param:Autowired private val userRepository: UserRepository,
@@ -18,6 +23,7 @@ class UserRepositoryImplTest(
 
     @BeforeEach
     fun setUp() {
+        jdbcTemplate.execute("DROP TABLE IF EXISTS users")
         jdbcTemplate.execute(UserDO.DDL.trimIndent())
     }
 
