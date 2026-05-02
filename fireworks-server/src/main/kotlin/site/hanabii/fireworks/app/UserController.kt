@@ -110,7 +110,8 @@ enum class ErrorCode {
     VAULT_NOT_INITIALIZED,
     NOT_AUTHENTICATED,
     INVALID_CREDENTIALS,
-    ENTRY_NOT_FOUND
+    ENTRY_NOT_FOUND,
+    ACCOUNT_EXISTS
 }
 
 class AppException(

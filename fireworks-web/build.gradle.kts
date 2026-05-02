@@ -31,3 +31,11 @@ tasks.register<Exec>("buildFrontend") {
     inputs.file("$frontendDir/index.html")
     outputs.dir("$frontendDir/dist")
 }
+
+// 运行前端开发服务器（热部署）
+tasks.register<Exec>("runDev") {
+    group = "application"
+    description = "Run Vue frontend dev server with hot reload"
+    workingDir = frontendDir
+    commandLine("npm", "run", "dev")
+}
