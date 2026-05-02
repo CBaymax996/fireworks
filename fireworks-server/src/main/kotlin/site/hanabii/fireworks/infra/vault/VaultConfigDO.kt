@@ -1,10 +1,11 @@
-package site.hanabii.fireworks.infra
+package site.hanabii.fireworks.infra.vault
 
 import org.ktorm.dsl.QueryRowSet
 import org.ktorm.schema.Table
 import org.ktorm.schema.long
 import org.ktorm.schema.timestamp
 import org.ktorm.schema.varchar
+import site.hanabii.fireworks.domain.vault.VaultConfig
 import java.time.Instant
 import java.util.Base64
 
@@ -30,10 +31,9 @@ object VaultConfigDO : Table<Nothing>("vault_config") {
 
 private val base64Decoder = Base64.getDecoder()
 
-fun QueryRowSet.toVaultConfig(): site.hanabii.fireworks.domain.VaultConfig =
-    site.hanabii.fireworks.domain.VaultConfig(
-        id = this[VaultConfigDO.id] ?: 1,
-        passwordHash = this[VaultConfigDO.passwordHash] ?: "",
-        encryptionSalt = this[VaultConfigDO.encryptionSalt]?.let { base64Decoder.decode(it) } ?: ByteArray(0),
-        createdAt = this[VaultConfigDO.createdAt] ?: Instant.now()
-    )
+fun QueryRowSet.toVaultConfig(): VaultConfig = VaultConfig(
+    id = this[VaultConfigDO.id] ?: 1,
+    passwordHash = this[VaultConfigDO.passwordHash] ?: "",
+    encryptionSalt = this[VaultConfigDO.encryptionSalt]?.let { base64Decoder.decode(it) } ?: ByteArray(0),
+    createdAt = this[VaultConfigDO.createdAt] ?: Instant.now()
+)

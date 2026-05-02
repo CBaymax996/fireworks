@@ -2,8 +2,8 @@ package site.hanabii.fireworks.app
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.stereotype.Service
-import site.hanabii.fireworks.domain.Account
-import site.hanabii.fireworks.domain.AccountRepository
+import site.hanabii.fireworks.domain.auth.Account
+import site.hanabii.fireworks.domain.auth.AccountRepository
 
 /**
  * Web 账号认证服务。

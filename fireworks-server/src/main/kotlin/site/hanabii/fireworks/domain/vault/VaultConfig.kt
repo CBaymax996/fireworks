@@ -1,4 +1,4 @@
-package site.hanabii.fireworks.domain
+package site.hanabii.fireworks.domain.vault
 
 import java.time.Instant
 

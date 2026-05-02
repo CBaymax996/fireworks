@@ -1,4 +1,4 @@
-package site.hanabii.fireworks.infra
+package site.hanabii.fireworks.infra.vault
 
 import org.ktorm.database.Database
 import org.ktorm.dsl.eq
@@ -9,8 +9,8 @@ import org.ktorm.dsl.select
 import org.ktorm.dsl.update
 import org.ktorm.dsl.where
 import org.springframework.stereotype.Repository
-import site.hanabii.fireworks.domain.VaultConfig
-import site.hanabii.fireworks.domain.VaultRepository
+import site.hanabii.fireworks.domain.vault.VaultConfig
+import site.hanabii.fireworks.domain.vault.VaultRepository
 import java.util.Base64
 
 /**

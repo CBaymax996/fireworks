@@ -1,4 +1,4 @@
-package site.hanabii.fireworks.app
+package site.hanabii.fireworks.app.vault
 
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -16,14 +16,11 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.context.WebApplicationContext
-import site.hanabii.fireworks.infra.PasswordEntryDO
-import site.hanabii.fireworks.infra.VaultConfigDO
+import site.hanabii.fireworks.infra.vault.PasswordEntryDO
+import site.hanabii.fireworks.infra.vault.VaultConfigDO
 
 /**
  * 密码库控制器集成测试。
- *
- * 使用 MockMvc 对 /api/vault/ 全部端点进行端到端测试，覆盖：
- * setup / login / logout / status、entries CRUD、认证与初始化拦截、异常路径。
  */
 @SpringBootTest
 class VaultControllerTest {
@@ -150,20 +147,21 @@ class VaultControllerTest {
     // ---------- entries CRUD ----------
 
     @Test
-    fun `create and list entries should work`() {
+    fun `create and list entries should return metadata without password`() {
         val session = setupVaultAndLogin("主密码")
 
         mockMvc.perform(
             post("/api/vault/entries")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"website": "github.com", "username": "alice", "password": "gh_secret", "notes": ""}""")
+                .content("""{"website": "github.com", "username": "alice"}""")
         )
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.id").exists())
             .andExpect(jsonPath("$.website").value("github.com"))
             .andExpect(jsonPath("$.username").value("alice"))
-            .andExpect(jsonPath("$.password").value("gh_secret"))
+            .andExpect(jsonPath("$.counter").value(1))
+            .andExpect(jsonPath("$.password").doesNotExist())
 
         mockMvc.perform(get("/api/vault/entries").session(session))
             .andExpect(status().isOk)
@@ -172,14 +170,27 @@ class VaultControllerTest {
     }
 
     @Test
-    fun `create entry should fail with blank fields`() {
+    fun `create entry should fail with blank website`() {
         val session = setupVaultAndLogin("主密码")
 
         mockMvc.perform(
             post("/api/vault/entries")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"website": "", "username": "u", "password": "p"}""")
+                .content("""{"website": "", "username": "u"}""")
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `create entry should fail with length 7`() {
+        val session = setupVaultAndLogin("主密码")
+
+        mockMvc.perform(
+            post("/api/vault/entries")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"website": "x.com", "username": "u", "length": 7}""")
         )
             .andExpect(status().isBadRequest)
     }
@@ -187,12 +198,11 @@ class VaultControllerTest {
     @Test
     fun `get entry should return entry`() {
         val session = setupVaultAndLogin("主密码")
-        val id = createEntry(session, "gmail.com", "bob", "gm_secret")
+        val id = createEntry(session, "gmail.com", "bob")
 
         mockMvc.perform(get("/api/vault/entries/$id").session(session))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.website").value("gmail.com"))
-            .andExpect(jsonPath("$.password").value("gm_secret"))
     }
 
     @Test
@@ -207,21 +217,17 @@ class VaultControllerTest {
     @Test
     fun `update entry should modify existing entry`() {
         val session = setupVaultAndLogin("主密码")
-        val id = createEntry(session, "old.com", "u", "p")
+        val id = createEntry(session, "old.com", "u")
 
         mockMvc.perform(
             put("/api/vault/entries/$id")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"website": "new.com", "username": "v", "password": "q", "notes": "n"}""")
+                .content("""{"website": "new.com", "username": "v", "length": 32}""")
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.website").value("new.com"))
-            .andExpect(jsonPath("$.password").value("q"))
-
-        mockMvc.perform(get("/api/vault/entries/$id").session(session))
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.website").value("new.com"))
+            .andExpect(jsonPath("$.length").value(32))
     }
 
     @Test
@@ -232,7 +238,7 @@ class VaultControllerTest {
             put("/api/vault/entries/9999")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"website": "x", "username": "u", "password": "p", "notes": ""}""")
+                .content("""{"website": "x", "username": "u"}""")
         )
             .andExpect(status().isNotFound)
     }
@@ -240,7 +246,7 @@ class VaultControllerTest {
     @Test
     fun `delete entry should remove entry`() {
         val session = setupVaultAndLogin("主密码")
-        val id = createEntry(session, "del.com", "u", "p")
+        val id = createEntry(session, "del.com", "u")
 
         mockMvc.perform(delete("/api/vault/entries/$id").session(session))
             .andExpect(status().isNoContent)
@@ -257,7 +263,7 @@ class VaultControllerTest {
             .andExpect(status().isNotFound)
     }
 
-    // ---------- 认证/初始化检查 ----------
+    // ---------- authentication checks ----------
 
     @Test
     fun `entries endpoints should require authentication`() {
@@ -277,19 +283,58 @@ class VaultControllerTest {
             .andExpect(jsonPath("$.code").value("VAULT_NOT_INITIALIZED"))
     }
 
-    @Test
-    fun `create entry should fail when not authenticated`() {
-        setupVault("密码")
+    // ---------- rotate and derive ----------
 
-        mockMvc.perform(
-            post("/api/vault/entries")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"website": "x", "username": "u", "password": "p", "notes": ""}""")
-        )
-            .andExpect(status().isUnauthorized)
+    @Test
+    fun `rotate should increment counter`() {
+        val session = setupVaultAndLogin("主密码")
+        val id = createEntry(session, "rotate.com", "u")
+
+        mockMvc.perform(post("/api/vault/entries/$id/rotate").session(session))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.counter").value(2))
+
+        mockMvc.perform(post("/api/vault/entries/$id/rotate").session(session))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.counter").value(3))
     }
 
-    // ---------- 辅助方法 ----------
+    @Test
+    fun `derive password should return password with correct length`() {
+        val session = setupVaultAndLogin("主密码")
+        val id = createEntry(session, "github.com", "alice")
+
+        mockMvc.perform(get("/api/vault/entries/$id/password").session(session))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.password").isString)
+            .andExpect(jsonPath("$.counter").value(1))
+    }
+
+    @Test
+    fun `derive password with historical counter should work`() {
+        val session = setupVaultAndLogin("主密码")
+        val id = createEntry(session, "hist.com", "u")
+
+        val pwd1 = mockMvc.perform(get("/api/vault/entries/$id/password?counter=1").session(session))
+            .andExpect(status().isOk)
+            .andReturn()
+            .response.contentAsString
+
+        mockMvc.perform(post("/api/vault/entries/$id/rotate").session(session))
+        mockMvc.perform(post("/api/vault/entries/$id/rotate").session(session))
+
+        val pwd1Replay = mockMvc.perform(get("/api/vault/entries/$id/password?counter=1").session(session))
+            .andExpect(status().isOk)
+            .andReturn()
+            .response.contentAsString
+
+        // 比较 password 字段（不能直接比整个 JSON，因为 updatedAt 在 rotate 后变了）
+        val pwd1Password = Regex(""""password":"([^"]+)"""").find(pwd1)!!.groupValues[1]
+        val pwd1ReplayPassword = Regex(""""password":"([^"]+)"""").find(pwd1Replay)!!.groupValues[1]
+        assert(pwd1Password == pwd1ReplayPassword) { "Historical counter 1 should replay same password" }
+    }
+
+    // ---------- helpers ----------
 
     private fun setupVault(password: String) {
         mockMvc.perform(
@@ -313,12 +358,12 @@ class VaultControllerTest {
         return session
     }
 
-    private fun createEntry(session: MockHttpSession, website: String, username: String, password: String): Long {
+    private fun createEntry(session: MockHttpSession, website: String, username: String): Long {
         val result = mockMvc.perform(
             post("/api/vault/entries")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"website": "$website", "username": "$username", "password": "$password", "notes": ""}""")
+                .content("""{"website": "$website", "username": "$username"}""")
         )
             .andExpect(status().isCreated)
             .andReturn()

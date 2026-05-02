@@ -1,4 +1,4 @@
-package site.hanabii.fireworks.infra
+package site.hanabii.fireworks.infra.vault
 
 import org.ktorm.database.Database
 import org.ktorm.dsl.delete
@@ -10,8 +10,8 @@ import org.ktorm.dsl.select
 import org.ktorm.dsl.update
 import org.ktorm.dsl.where
 import org.springframework.stereotype.Repository
-import site.hanabii.fireworks.domain.PasswordEntry
-import site.hanabii.fireworks.domain.PasswordEntryRepository
+import site.hanabii.fireworks.domain.vault.PasswordEntry
+import site.hanabii.fireworks.domain.vault.PasswordEntryRepository
 import java.time.Instant
 
 /**
@@ -32,8 +32,13 @@ class PasswordEntryRepositoryImpl(
             database.insert(PasswordEntryDO) {
                 set(it.website, entry.website)
                 set(it.username, entry.username)
-                set(it.encryptedPassword, entry.password)
                 set(it.notes, entry.notes)
+                set(it.counter, entry.counter)
+                set(it.length, entry.length)
+                set(it.useLowercase, if (entry.useLowercase) 1 else 0)
+                set(it.useUppercase, if (entry.useUppercase) 1 else 0)
+                set(it.useDigits, if (entry.useDigits) 1 else 0)
+                set(it.useSymbols, if (entry.useSymbols) 1 else 0)
                 set(it.createdAt, entry.createdAt)
                 set(it.updatedAt, now)
             }
@@ -54,8 +59,13 @@ class PasswordEntryRepositoryImpl(
             database.update(PasswordEntryDO) {
                 set(it.website, entry.website)
                 set(it.username, entry.username)
-                set(it.encryptedPassword, entry.password)
                 set(it.notes, entry.notes)
+                set(it.counter, entry.counter)
+                set(it.length, entry.length)
+                set(it.useLowercase, if (entry.useLowercase) 1 else 0)
+                set(it.useUppercase, if (entry.useUppercase) 1 else 0)
+                set(it.useDigits, if (entry.useDigits) 1 else 0)
+                set(it.useSymbols, if (entry.useSymbols) 1 else 0)
                 set(it.updatedAt, now)
                 where { it.id eq entry.id }
             }

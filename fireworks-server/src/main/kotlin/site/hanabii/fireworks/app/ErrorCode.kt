@@ -1,0 +1,12 @@
+package site.hanabii.fireworks.app
+
+enum class ErrorCode {
+    USER_NOT_FOUND,
+    INVALID_REQUEST,
+    INTERNAL_ERROR,
+    VAULT_NOT_INITIALIZED,
+    NOT_AUTHENTICATED,
+    INVALID_CREDENTIALS,
+    ENTRY_NOT_FOUND,
+    ACCOUNT_EXISTS
+}

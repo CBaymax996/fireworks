@@ -1,11 +1,7 @@
 package site.hanabii.fireworks.app
 
-import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseEntity
-import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -14,12 +10,8 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.bind.annotation.RestControllerAdvice
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import site.hanabii.fireworks.domain.User
 import site.hanabii.fireworks.domain.UserRepository
-
-import java.time.Instant
 
 @RestController
 @RequestMapping("/users")
@@ -99,71 +91,6 @@ private fun UpdateUserRequest.validate() {
             code = ErrorCode.INVALID_REQUEST,
             status = HttpStatus.BAD_REQUEST,
             message = "username and email must not be blank"
-        )
-    }
-}
-
-enum class ErrorCode {
-    USER_NOT_FOUND,
-    INVALID_REQUEST,
-    INTERNAL_ERROR,
-    VAULT_NOT_INITIALIZED,
-    NOT_AUTHENTICATED,
-    INVALID_CREDENTIALS,
-    ENTRY_NOT_FOUND,
-    ACCOUNT_EXISTS
-}
-
-class AppException(
-    val code: ErrorCode,
-    val status: HttpStatus,
-    override val message: String
-) : RuntimeException(message)
-
-data class ErrorResponse(
-    val code: String,
-    val message: String,
-    val path: String,
-    val timestamp: Instant = Instant.now()
-)
-
-@RestControllerAdvice
-class GlobalExceptionHandler {
-
-    @ExceptionHandler(AppException::class)
-    fun handleAppException(ex: AppException, request: HttpServletRequest): ResponseEntity<ErrorResponse> {
-        return ResponseEntity.status(ex.status).body(
-            ErrorResponse(
-                code = ex.code.name,
-                message = ex.message,
-                path = request.requestURI
-            )
-        )
-    }
-
-    @ExceptionHandler(
-        HttpMessageNotReadableException::class,
-        MethodArgumentTypeMismatchException::class,
-        IllegalArgumentException::class
-    )
-    fun handleBadRequest(ex: Exception, request: HttpServletRequest): ResponseEntity<ErrorResponse> {
-        return ResponseEntity.badRequest().body(
-            ErrorResponse(
-                code = ErrorCode.INVALID_REQUEST.name,
-                message = ex.message ?: "Invalid request",
-                path = request.requestURI
-            )
-        )
-    }
-
-    @ExceptionHandler(Exception::class)
-    fun handleUnexpectedException(request: HttpServletRequest): ResponseEntity<ErrorResponse> {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-            ErrorResponse(
-                code = ErrorCode.INTERNAL_ERROR.name,
-                message = "Internal server error",
-                path = request.requestURI
-            )
         )
     }
 }

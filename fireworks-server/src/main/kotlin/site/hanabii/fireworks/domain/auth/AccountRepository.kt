@@ -1,4 +1,4 @@
-package site.hanabii.fireworks.domain
+package site.hanabii.fireworks.domain.auth
 
 /**
  * 账号仓储接口。

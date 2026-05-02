@@ -1,4 +1,4 @@
-package site.hanabii.fireworks.infra
+package site.hanabii.fireworks.infra.auth
 
 import org.ktorm.database.Database
 import org.ktorm.dsl.QueryRowSet
@@ -10,8 +10,8 @@ import org.ktorm.dsl.map
 import org.ktorm.dsl.select
 import org.ktorm.dsl.where
 import org.springframework.stereotype.Repository
-import site.hanabii.fireworks.domain.Account
-import site.hanabii.fireworks.domain.AccountRepository
+import site.hanabii.fireworks.domain.auth.Account
+import site.hanabii.fireworks.domain.auth.AccountRepository
 
 /**
  * 基于 Ktorm + SQLite 的 AccountRepository 实现。

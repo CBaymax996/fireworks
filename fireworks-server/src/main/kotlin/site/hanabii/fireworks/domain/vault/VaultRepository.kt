@@ -1,4 +1,4 @@
-package site.hanabii.fireworks.domain
+package site.hanabii.fireworks.domain.vault
 
 /**
  * 密码库配置仓储接口。

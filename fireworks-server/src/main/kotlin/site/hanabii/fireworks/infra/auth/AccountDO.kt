@@ -1,10 +1,11 @@
-package site.hanabii.fireworks.infra
+package site.hanabii.fireworks.infra.auth
 
 import org.ktorm.dsl.QueryRowSet
 import org.ktorm.schema.Table
 import org.ktorm.schema.long
 import org.ktorm.schema.timestamp
 import org.ktorm.schema.varchar
+import site.hanabii.fireworks.domain.auth.Account
 import java.time.Instant
 
 /**
@@ -26,7 +27,7 @@ object AccountDO : Table<Nothing>("accounts") {
     """
 }
 
-fun QueryRowSet.toAccount(): site.hanabii.fireworks.domain.Account = site.hanabii.fireworks.domain.Account(
+fun QueryRowSet.toAccount(): Account = Account(
     id = this[AccountDO.id],
     username = this[AccountDO.username] ?: "",
     passwordHash = this[AccountDO.passwordHash] ?: "",

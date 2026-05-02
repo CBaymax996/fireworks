@@ -1,4 +1,4 @@
-package site.hanabii.fireworks.infra
+package site.hanabii.fireworks.infra.vault
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -6,13 +6,11 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
-import site.hanabii.fireworks.domain.VaultConfig
-import site.hanabii.fireworks.domain.VaultRepository
+import site.hanabii.fireworks.domain.vault.VaultConfig
+import site.hanabii.fireworks.domain.vault.VaultRepository
 
 /**
  * 密码库配置仓储集成测试。
- *
- * 覆盖：insert / update、find / exists、salt 的 Base64 编解码往返。
  */
 @SpringBootTest
 class VaultRepositoryImplTest(
