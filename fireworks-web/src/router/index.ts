@@ -24,6 +24,26 @@ const router = createRouter({
       name: 'register',
       component: () => import('../views/RegisterView.vue'),
     },
+    {
+      path: '/vault',
+      name: 'vault',
+      component: () => import('../views/VaultView.vue'),
+    },
+    {
+      path: '/family-trees',
+      name: 'familyTreeList',
+      component: () => import('../views/FamilyTreeListView.vue'),
+    },
+    {
+      path: '/family-trees/:id',
+      name: 'familyTree',
+      component: () => import('../views/FamilyTreeView.vue'),
+    },
+    {
+      path: '/family-trees/:id/person/:personId',
+      name: 'personEdit',
+      component: () => import('../views/PersonEditView.vue'),
+    },
   ],
 })
 

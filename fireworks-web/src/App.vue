@@ -1,96 +1,169 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
+import { onMounted, ref } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { Sunny, Moon } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
+const router = useRouter()
+const route = useRoute()
+
+const isDark = ref(false)
+
+function applyTheme(dark: boolean) {
+  isDark.value = dark
+  const cl = document.documentElement.classList
+  cl.remove('dark', 'light')
+  cl.add(dark ? 'dark' : 'light')
+  localStorage.setItem('theme', dark ? 'dark' : 'light')
+}
+
+function toggleTheme() {
+  applyTheme(!isDark.value)
+}
+
+onMounted(() => {
+  authStore.checkStatus()
+  const saved = localStorage.getItem('theme')
+  if (saved) {
+    applyTheme(saved === 'dark')
+  } else {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    if (prefersDark) {
+      isDark.value = true
+      document.documentElement.classList.add('dark')
+    } else {
+      isDark.value = false
+      document.documentElement.classList.add('light')
+    }
+  }
+})
+
+function handleLogout() {
+  authStore.logout().then(() => {
+    router.push('/')
+  })
+}
 </script>
 
 <template>
-  <header>
-    <div class="wrapper">
-      <h1>Fireworks</h1>
+  <el-container class="app-container">
+    <!-- 顶部导航栏 -->
+    <el-header class="app-header">
+      <div class="header-left">
+        <span class="app-logo">Fireworks</span>
+        <el-menu
+          :default-active="route.path"
+          mode="horizontal"
+          :ellipsis="false"
+          router
+          class="header-menu"
+        >
+          <el-menu-item index="/">主页</el-menu-item>
+          <el-menu-item index="/vault">密码本</el-menu-item>
+          <el-menu-item index="/family-trees">族谱</el-menu-item>
+        </el-menu>
+      </div>
 
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
+      <div class="header-right">
+        <el-button size="small" circle @click="toggleTheme" :title="isDark ? '切换亮色' : '切换暗色'">
+          <el-icon><Moon v-if="isDark" /><Sunny v-else /></el-icon>
+        </el-button>
         <template v-if="!authStore.isAuthenticated">
-          <RouterLink to="/login">登录</RouterLink>
-          <RouterLink to="/register">注册</RouterLink>
+          <el-button size="small" @click="router.push('/login')">登录</el-button>
+          <el-button size="small" type="primary" @click="router.push('/register')">注册</el-button>
         </template>
         <template v-else>
-          <span class="user">{{ authStore.account?.username }}</span>
-          <a href="#" @click.prevent="authStore.logout()">登出</a>
+          <span class="header-user">{{ authStore.account?.username }}</span>
+          <el-button size="small" @click="handleLogout">登出</el-button>
         </template>
-      </nav>
-    </div>
-  </header>
+      </div>
+    </el-header>
 
-  <RouterView />
+    <!-- 内容区域 -->
+    <el-main class="app-main">
+      <router-view />
+    </el-main>
+  </el-container>
 </template>
 
-<style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
+<style>
+/* 全局重置 — 覆盖 main.css 中不适用的样式 */
+body {
+  margin: 0;
+  display: block;
+  place-items: unset;
 }
 
-.wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 1rem;
-}
-
-nav {
-  width: 100%;
-  font-size: 14px;
-  text-align: center;
-  margin-top: 1rem;
-}
-
-nav a.router-link-exact-active {
-  color: var(--color-text);
-}
-
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
-}
-
-nav a,
-nav span {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
-}
-
-nav a:first-of-type {
-  border: 0;
-}
-
-.user {
-  color: #42b883;
-  font-weight: 600;
+#app {
+  max-width: none;
+  padding: 0;
+  display: block;
+  grid-template-columns: unset;
 }
 
 @media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
+  body {
+    display: block;
+    place-items: unset;
   }
+  #app {
+    display: block;
+    grid-template-columns: unset;
+  }
+}
+</style>
 
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
+<style scoped>
+.app-container {
+  min-height: 100vh;
+}
 
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-    padding: 1rem 0;
-    margin-top: 1rem;
-  }
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid var(--el-border-color-light);
+  height: 60px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.app-logo {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--el-color-primary);
+  white-space: nowrap;
+}
+
+.header-menu {
+  border-bottom: none !important;
+}
+
+.header-menu .el-menu-item {
+  height: 60px;
+  line-height: 60px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.header-user {
+  font-size: 0.9rem;
+  color: var(--el-text-color-regular);
+}
+
+.app-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem;
 }
 </style>
