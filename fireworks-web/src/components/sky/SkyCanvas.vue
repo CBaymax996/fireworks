@@ -32,39 +32,34 @@ const bgGradient = computed(() => {
 <template>
   <div class="sky-canvas" :style="{ background: bgGradient }">
     <Transition name="fade" mode="out-in">
-      <!-- 晴天 -->
-      <template v-if="scene === 'sunny'">
-        <SunElement key="sunny-sun" />
-        <CloudElement key="sunny-c1" :size="100" :top="22" :speed="35" :delay="0" :opacity="0.5" />
-        <CloudElement key="sunny-c2" :size="70" :top="35" :speed="28" :delay="8" :opacity="0.35" />
-      </template>
+      <div v-if="scene === 'sunny'" key="sunny">
+        <SunElement />
+        <CloudElement :size="100" :top="22" :speed="35" :delay="0" :opacity="0.5" />
+        <CloudElement :size="70" :top="35" :speed="28" :delay="8" :opacity="0.35" />
+      </div>
 
-      <!-- 多云 -->
-      <template v-else-if="scene === 'cloudy'">
-        <CloudElement key="cld-c1" :size="200" :top="10" :speed="22" :delay="0" :opacity="0.9" />
-        <CloudElement key="cld-c2" :size="170" :top="28" :speed="28" :delay="6" :opacity="0.75" />
-        <CloudElement key="cld-c3" :size="140" :top="42" :speed="32" :delay="12" :opacity="0.6" />
-        <CloudElement key="cld-c4" :size="180" :top="55" :speed="25" :delay="4" :opacity="0.5" />
-      </template>
+      <div v-else-if="scene === 'cloudy'" key="cloudy">
+        <CloudElement :size="200" :top="10" :speed="22" :delay="0" :opacity="0.9" />
+        <CloudElement :size="170" :top="28" :speed="28" :delay="6" :opacity="0.75" />
+        <CloudElement :size="140" :top="42" :speed="32" :delay="12" :opacity="0.6" />
+        <CloudElement :size="180" :top="55" :speed="25" :delay="4" :opacity="0.5" />
+      </div>
 
-      <!-- 雨天 -->
-      <template v-else-if="scene === 'rainy'">
-        <CloudElement key="rain-c1" :size="200" :top="8" :speed="22" :delay="0" :opacity="0.8" />
-        <CloudElement key="rain-c2" :size="170" :top="18" :speed="28" :delay="5" :opacity="0.65" />
-        <RainElement key="rain-drops" />
-      </template>
+      <div v-else-if="scene === 'rainy'" key="rainy">
+        <CloudElement :size="200" :top="8" :speed="22" :delay="0" :opacity="0.8" />
+        <CloudElement :size="170" :top="18" :speed="28" :delay="5" :opacity="0.65" />
+        <RainElement />
+      </div>
 
-      <!-- 雪天 -->
-      <template v-else-if="scene === 'snowy'">
-        <CloudElement key="snow-c1" :size="200" :top="8" :speed="25" :delay="0" :opacity="0.7" />
-        <CloudElement key="snow-c2" :size="160" :top="20" :speed="30" :delay="7" :opacity="0.55" />
-        <SnowElement key="snow-flakes" />
-      </template>
+      <div v-else-if="scene === 'snowy'" key="snowy">
+        <CloudElement :size="200" :top="8" :speed="25" :delay="0" :opacity="0.7" />
+        <CloudElement :size="160" :top="20" :speed="30" :delay="7" :opacity="0.55" />
+        <SnowElement />
+      </div>
 
-      <!-- 夜晚 -->
-      <template v-else-if="scene === 'night'">
-        <MoonStars key="night-moon" />
-      </template>
+      <div v-else key="night">
+        <MoonStars />
+      </div>
     </Transition>
   </div>
 </template>
