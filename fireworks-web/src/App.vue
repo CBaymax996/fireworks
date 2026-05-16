@@ -2,41 +2,30 @@
 import { onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Sunny, Moon } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
-const isDark = ref(false)
+const isDark = ref(true)
 
 function applyTheme(dark: boolean) {
-  isDark.value = dark
-  const cl = document.documentElement.classList
-  cl.remove('dark', 'light')
-  cl.add(dark ? 'dark' : 'light')
-  localStorage.setItem('theme', dark ? 'dark' : 'light')
+  document.documentElement.classList.toggle('dark', dark)
 }
 
 function toggleTheme() {
-  applyTheme(!isDark.value)
+  isDark.value = !isDark.value
+  applyTheme(isDark.value)
+  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
 }
 
 onMounted(() => {
   authStore.checkStatus()
   const saved = localStorage.getItem('theme')
-  if (saved) {
-    applyTheme(saved === 'dark')
-  } else {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    if (prefersDark) {
-      isDark.value = true
-      document.documentElement.classList.add('dark')
-    } else {
-      isDark.value = false
-      document.documentElement.classList.add('light')
-    }
+  if (saved === 'light') {
+    isDark.value = false
   }
+  applyTheme(isDark.value)
 })
 
 function handleLogout() {
@@ -47,123 +36,157 @@ function handleLogout() {
 </script>
 
 <template>
-  <el-container class="app-container">
-    <!-- 顶部导航栏 -->
-    <el-header class="app-header">
-      <div class="header-left">
-        <span class="app-logo">Fireworks</span>
-        <el-menu
-          :default-active="route.path"
-          mode="horizontal"
-          :ellipsis="false"
-          router
-          class="header-menu"
-        >
-          <el-menu-item index="/">主页</el-menu-item>
-          <el-menu-item index="/vault">密码本</el-menu-item>
-          <el-menu-item index="/family-trees">族谱</el-menu-item>
-        </el-menu>
-      </div>
+  <div class="app-shell">
+    <!-- 自定义暗色导航栏 -->
+    <nav class="fw-nav">
+      <div class="fw-nav-inner">
+        <router-link to="/" class="fw-nav-brand">
+          <span class="fw-nav-icon">🎆</span>
+          Fireworks
+        </router-link>
 
-      <div class="header-right">
-        <el-button size="small" circle @click="toggleTheme" :title="isDark ? '切换亮色' : '切换暗色'">
-          <el-icon><Moon v-if="isDark" /><Sunny v-else /></el-icon>
-        </el-button>
-        <template v-if="!authStore.isAuthenticated">
-          <el-button size="small" @click="router.push('/login')">登录</el-button>
-          <el-button size="small" type="primary" @click="router.push('/register')">注册</el-button>
-        </template>
-        <template v-else>
-          <span class="header-user">{{ authStore.account?.username }}</span>
-          <el-button size="small" @click="handleLogout">登出</el-button>
-        </template>
+        <div class="fw-nav-links">
+          <router-link
+            to="/"
+            class="fw-nav-link"
+            :class="{ active: route.path === '/' }"
+          >主页</router-link>
+          <router-link
+            to="/vault"
+            class="fw-nav-link"
+            :class="{ active: route.path === '/vault' }"
+          >密码本</router-link>
+          <router-link
+            to="/family-trees"
+            class="fw-nav-link"
+            :class="{ active: route.path.startsWith('/family-trees') }"
+          >族谱</router-link>
+        </div>
+
+        <div class="fw-nav-actions">
+          <button
+            class="fw-btn fw-btn-ghost fw-btn-sm theme-toggle"
+            @click="toggleTheme"
+            :title="isDark ? '切换亮色' : '切换暗色'"
+          >
+            {{ isDark ? '☀' : '🌙' }}
+          </button>
+
+          <template v-if="!authStore.isAuthenticated">
+            <button class="fw-btn fw-btn-sm" @click="router.push('/login')">
+              登录
+            </button>
+            <button class="fw-btn fw-btn-primary fw-btn-sm" @click="router.push('/register')">
+              注册
+            </button>
+          </template>
+          <template v-else>
+            <span class="fw-nav-user mono">{{ authStore.account?.username }}</span>
+            <button class="fw-btn fw-btn-sm" @click="handleLogout">登出</button>
+          </template>
+        </div>
       </div>
-    </el-header>
+    </nav>
 
     <!-- 内容区域 -->
-    <el-main class="app-main">
+    <main class="fw-main">
       <router-view />
-    </el-main>
-  </el-container>
+    </main>
+  </div>
 </template>
 
-<style>
-/* 全局重置 — 覆盖 main.css 中不适用的样式 */
-body {
-  margin: 0;
-  display: block;
-  place-items: unset;
-}
-
-#app {
-  max-width: none;
-  padding: 0;
-  display: block;
-  grid-template-columns: unset;
-}
-
-@media (min-width: 1024px) {
-  body {
-    display: block;
-    place-items: unset;
-  }
-  #app {
-    display: block;
-    grid-template-columns: unset;
-  }
-}
-</style>
-
 <style scoped>
-.app-container {
+.app-shell {
   min-height: 100vh;
-}
-
-.app-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 1.5rem;
-  border-bottom: 1px solid var(--el-border-color-light);
-  height: 60px;
+  flex-direction: column;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+/* 导航栏 */
+.fw-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: 56px;
+  border-bottom: 1px solid var(--fw-border);
+  background: var(--fw-nav-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
-.app-logo {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--el-color-primary);
-  white-space: nowrap;
-}
-
-.header-menu {
-  border-bottom: none !important;
-}
-
-.header-menu .el-menu-item {
-  height: 60px;
-  line-height: 60px;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.header-user {
-  font-size: 0.9rem;
-  color: var(--el-text-color-regular);
-}
-
-.app-main {
-  max-width: 960px;
+.fw-nav-inner {
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 1.5rem;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 1.5rem;
+  gap: 2rem;
+}
+
+.fw-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--fw-accent);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.fw-nav-brand:hover {
+  color: var(--fw-accent-hover);
+}
+
+.fw-nav-icon {
+  font-size: 1.3rem;
+}
+
+.fw-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.fw-nav-link {
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--fw-radius);
+  font-size: 0.9rem;
+  color: var(--fw-text-dim);
+  transition: all 0.25s;
+}
+
+.fw-nav-link:hover {
+  color: var(--fw-text);
+  background: rgba(255, 215, 0, 0.08);
+}
+
+.fw-nav-link.active {
+  color: var(--fw-accent);
+  background: rgba(255, 215, 0, 0.1);
+}
+
+.fw-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.theme-toggle {
+  font-size: 1.1rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.fw-nav-user {
+  font-size: 0.85rem;
+  color: var(--fw-secondary);
+}
+
+/* 内容区 */
+.fw-main {
+  flex: 1;
+  min-height: 0;
 }
 </style>

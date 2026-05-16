@@ -1,35 +1,150 @@
-@import './base.css';
+/* Fireworks 暗色主题全局样式 — 参考 hermesagent.org.cn */
+
+/* 公共变量 */
+:root {
+  --fw-radius: 8px;
+  --fw-radius-lg: 12px;
+  --fw-font-serif: Georgia, 'Times New Roman', 'Noto Serif SC', 'Source Han Serif SC', serif;
+  --fw-font-mono: 'Courier New', 'Source Code Pro', Courier, 'Noto Sans Mono SC', monospace;
+  color-scheme: light;
+}
+
+/* 亮色主题（默认） */
+:root {
+  --fw-bg: #ffffff;
+  --fw-bg-soft: #f5f5f7;
+  --fw-bg-mute: #eeeeee;
+  --fw-nav-bg: rgba(255, 255, 255, 0.85);
+  --fw-text: #1a1a1a;
+  --fw-text-dim: rgba(0, 0, 0, 0.5);
+  --fw-accent: #b8860b;
+  --fw-accent-hover: #9a7209;
+  --fw-secondary: #2e7d32;
+  --fw-border: rgba(0, 0, 0, 0.1);
+  --fw-border-hover: rgba(0, 0, 0, 0.22);
+}
+
+/* 暗色主题 */
+html.dark {
+  --fw-bg: #041c1c;
+  --fw-bg-soft: #0a2a2a;
+  --fw-bg-mute: #0f3333;
+  --fw-nav-bg: rgba(4, 28, 28, 0.85);
+  --fw-text: #ffe6cb;
+  --fw-text-dim: rgba(255, 230, 203, 0.6);
+  --fw-accent: #ffd700;
+  --fw-accent-hover: #ffed4a;
+  --fw-secondary: #6ee7b7;
+  --fw-border: rgba(255, 230, 203, 0.28);
+  --fw-border-hover: rgba(255, 230, 203, 0.5);
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--fw-text);
+  background: var(--fw-bg);
+  font-family: var(--fw-font-serif);
+  font-size: 16px;
+  line-height: 1.6;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  display: block;
+  place-items: unset;
+}
 
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  font-weight: normal;
+  max-width: none;
+  padding: 0;
+  display: block;
+  min-height: 100vh;
 }
 
-a,
-.green {
+a {
+  color: var(--fw-accent);
   text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
-  padding: 3px;
+  transition: color 0.3s;
 }
 
-@media (hover: hover) {
-  a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
-  }
+a:hover {
+  color: var(--fw-accent-hover);
 }
 
-@media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
+/* 通用按钮 */
+.fw-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--fw-border);
+  border-radius: var(--fw-radius);
+  background: transparent;
+  color: var(--fw-text);
+  font-family: var(--fw-font-serif);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
 
-  #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
-  }
+.fw-btn:hover {
+  border-color: var(--fw-accent);
+  color: var(--fw-accent);
+}
+
+.fw-btn-primary {
+  background: var(--fw-accent);
+  color: #fff;
+  border-color: var(--fw-accent);
+  font-weight: 700;
+}
+
+.fw-btn-primary:hover {
+  background: var(--fw-accent-hover);
+  border-color: var(--fw-accent-hover);
+  color: #fff;
+}
+
+.fw-btn-ghost {
+  border-color: transparent;
+}
+
+.fw-btn-sm {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+/* 工具类 */
+code,
+pre,
+.mono {
+  font-family: var(--fw-font-mono);
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--fw-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--fw-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fw-border-hover);
 }
