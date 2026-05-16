@@ -55,7 +55,8 @@ class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception::class)
-    fun handleUnexpectedException(request: HttpServletRequest): ResponseEntity<ErrorResponse> {
+    fun handleUnexpectedException(ex: Exception, request: HttpServletRequest): ResponseEntity<ErrorResponse> {
+        ex.printStackTrace()
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
             ErrorResponse(
                 code = ErrorCode.INTERNAL_ERROR.name,
