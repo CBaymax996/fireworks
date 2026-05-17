@@ -33,6 +33,8 @@ class PasswordEntryRepositoryImpl(
                 set(it.website, entry.website)
                 set(it.username, entry.username)
                 set(it.notes, entry.notes)
+                set(it.password, entry.password)   // 加密后的密码（仅 STORED 模式）
+                set(it.mode, entry.mode)           // "DERIVED" 或 "STORED"
                 set(it.counter, entry.counter)
                 set(it.length, entry.length)
                 set(it.useLowercase, if (entry.useLowercase) 1 else 0)
@@ -60,6 +62,8 @@ class PasswordEntryRepositoryImpl(
                 set(it.website, entry.website)
                 set(it.username, entry.username)
                 set(it.notes, entry.notes)
+                set(it.password, entry.password)
+                set(it.mode, entry.mode)
                 set(it.counter, entry.counter)
                 set(it.length, entry.length)
                 set(it.useLowercase, if (entry.useLowercase) 1 else 0)

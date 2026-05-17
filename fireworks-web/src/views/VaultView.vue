@@ -17,6 +17,8 @@ const form = ref<EntryRequest>({
   website: '',
   username: '',
   notes: '',
+  mode: 'DERIVED',
+  password: '',
   counter: 1,
   length: 16,
   useLowercase: true,
@@ -24,6 +26,9 @@ const form = ref<EntryRequest>({
   useDigits: true,
   useSymbols: true,
 })
+
+// 存储模式：密码生成中
+const generatingPassword = ref(false)
 
 // 派生密码弹窗
 const showPassword = ref<number | null>(null)
@@ -61,6 +66,8 @@ function openCreateForm() {
     website: '',
     username: '',
     notes: '',
+    mode: 'DERIVED',
+    password: '',
     counter: 1,
     length: 16,
     useLowercase: true,
@@ -77,6 +84,8 @@ function openEditForm(entry: PasswordEntry) {
     website: entry.website,
     username: entry.username,
     notes: entry.notes,
+    mode: entry.mode || 'DERIVED',
+    password: entry.password || '',
     length: entry.length,
     useLowercase: entry.useLowercase,
     useUppercase: entry.useUppercase,
@@ -97,6 +106,7 @@ async function handleSubmitForm() {
     delete (req as any).counter
     await vault.editEntry(editingId.value, req)
   } else {
+    // 新建：存储模式下不需要 counter 和字符集参数（后端有默认值）
     await vault.addEntry(form.value)
   }
   closeForm()
@@ -118,6 +128,14 @@ async function handleDelete(entry: PasswordEntry) {
 // ---------- 派生密码 ----------
 
 async function handleDerive(entry: PasswordEntry) {
+  // 存储模式：直接显示密码字段（后端已解密返回）
+  if (entry.mode === 'STORED') {
+    showPassword.value = entry.id
+    passwordText.value = entry.password ?? ''
+    passwordCounter.value = null
+    return
+  }
+  // 派生模式：调用 derivePassword 接口
   const c = replayCounters.value[entry.id!]
   const counter = typeof c === 'number' && c > 0 ? c : undefined
   try {
@@ -158,6 +176,27 @@ async function handleRotate(entry: PasswordEntry) {
     await vault.rotate(entry.id!)
   } catch {
     // 用户取消
+  }
+}
+
+// ---------- 随机密码生成 ----------
+
+/** 点击「随机生成」按钮，调后端生成密码并填入表单 */
+async function handleGeneratePassword() {
+  generatingPassword.value = true
+  try {
+    const pwd = await vault.generatePassword({
+      length: form.value.length,
+      lowercase: form.value.useLowercase,
+      uppercase: form.value.useUppercase,
+      digits: form.value.useDigits,
+      symbols: form.value.useSymbols,
+    })
+    form.value.password = pwd
+  } catch {
+    // error handled in store
+  } finally {
+    generatingPassword.value = false
   }
 }
 
@@ -254,18 +293,27 @@ function charsetLabelFor(entry: PasswordEntry) {
             <div class="entry-main">
               <div class="entry-title-row">
                 <span class="entry-website">{{ entry.website }}</span>
-                <el-tag size="small" type="info">counter={{ entry.counter }}</el-tag>
+                <!-- 模式标签 -->
+                <el-tag v-if="entry.mode === 'STORED'" size="small" type="success">存储</el-tag>
+                <el-tag v-else size="small" type="info">派生</el-tag>
+                <!-- 派生模式才显示 counter -->
+                <el-tag v-if="entry.mode !== 'STORED'" size="small" type="info">counter={{ entry.counter }}</el-tag>
               </div>
               <div class="entry-sub">
                 <span class="entry-username">{{ entry.username }}</span>
-                <span class="entry-divider">·</span>
-                <span>长度={{ entry.length }}</span>
-                <span class="entry-divider">·</span>
-                <span>{{ charsetLabelFor(entry) }}</span>
+                <!-- 派生模式显示长度和字符集 -->
+                <template v-if="entry.mode !== 'STORED'">
+                  <span class="entry-divider">·</span>
+                  <span>长度={{ entry.length }}</span>
+                  <span class="entry-divider">·</span>
+                  <span>{{ charsetLabelFor(entry) }}</span>
+                </template>
               </div>
             </div>
             <div class="entry-ops">
+              <!-- 派生模式才显示 counter 回放输入框 -->
               <el-input-number
+                v-if="entry.mode !== 'STORED'"
                 v-model="replayCounters[entry.id!]"
                 :min="1"
                 :max="entry.counter"
@@ -275,17 +323,18 @@ function charsetLabelFor(entry: PasswordEntry) {
                 style="width: 110px"
               />
               <el-button size="small" @click="handleDerive(entry)">查看密码</el-button>
-              <el-button size="small" @click="handleRotate(entry)">轮换</el-button>
+              <!-- 派生模式才显示轮换按钮 -->
+              <el-button v-if="entry.mode !== 'STORED'" size="small" @click="handleRotate(entry)">轮换</el-button>
               <el-button size="small" @click="openEditForm(entry)">编辑</el-button>
               <el-button size="small" type="danger" plain @click="handleDelete(entry)">删除</el-button>
             </div>
           </div>
 
-          <!-- 派生密码结果 -->
+          <!-- 密码结果展示 -->
           <div v-if="showPassword === entry.id" class="password-reveal">
             <div class="password-reveal-main">
               <code>{{ passwordText }}</code>
-              <el-tag size="small">counter={{ passwordCounter }}</el-tag>
+              <el-tag v-if="passwordCounter != null" size="small">counter={{ passwordCounter }}</el-tag>
             </div>
             <div class="password-reveal-actions">
               <el-button size="small" type="success" plain @click="copyPassword">复制</el-button>
@@ -313,24 +362,58 @@ function charsetLabelFor(entry: PasswordEntry) {
           <el-form-item label="备注">
             <el-input v-model="form.notes" type="textarea" maxlength="1024" />
           </el-form-item>
-          <el-form-item v-if="editingId == null" label="初始 Counter">
-            <el-input-number v-model="form.counter" :min="1" style="width: 100%" />
+
+          <!-- 模式切换 -->
+          <el-form-item label="密码模式">
+            <el-radio-group v-model="form.mode">
+              <el-radio value="DERIVED">派生模式</el-radio>
+              <el-radio value="STORED">存储模式</el-radio>
+            </el-radio-group>
           </el-form-item>
-          <el-form-item>
-            <template #label>
-              <span>密码长度: {{ form.length }}</span>
-            </template>
-            <el-slider v-model="form.length" :min="8" :max="64" show-input />
-          </el-form-item>
-          <el-form-item>
-            <template #label>
-              <span>字符集 ({{ charsetLabel }})</span>
-            </template>
-            <el-checkbox v-model="form.useLowercase">a-z</el-checkbox>
-            <el-checkbox v-model="form.useUppercase">A-Z</el-checkbox>
-            <el-checkbox v-model="form.useDigits">0-9</el-checkbox>
-            <el-checkbox v-model="form.useSymbols">符号</el-checkbox>
-          </el-form-item>
+
+          <!-- 存储模式：密码输入 + 随机生成 -->
+          <template v-if="form.mode === 'STORED'">
+            <el-form-item label="密码" required>
+              <div style="display: flex; gap: 0.5rem; width: 100%">
+                <el-input
+                  v-model="form.password"
+                  type="password"
+                  show-password
+                  maxlength="256"
+                  placeholder="输入或生成随机密码"
+                  style="flex: 1"
+                />
+                <el-button
+                  :loading="generatingPassword"
+                  @click="handleGeneratePassword"
+                >
+                  {{ generatingPassword ? '生成中...' : '随机生成' }}
+                </el-button>
+              </div>
+            </el-form-item>
+          </template>
+
+          <!-- 派生模式：现有字段 -->
+          <template v-if="form.mode === 'DERIVED'">
+            <el-form-item v-if="editingId == null" label="初始 Counter">
+              <el-input-number v-model="form.counter" :min="1" style="width: 100%" />
+            </el-form-item>
+            <el-form-item>
+              <template #label>
+                <span>密码长度: {{ form.length }}</span>
+              </template>
+              <el-slider v-model="form.length" :min="8" :max="64" show-input />
+            </el-form-item>
+            <el-form-item>
+              <template #label>
+                <span>字符集 ({{ charsetLabel }})</span>
+              </template>
+              <el-checkbox v-model="form.useLowercase">a-z</el-checkbox>
+              <el-checkbox v-model="form.useUppercase">A-Z</el-checkbox>
+              <el-checkbox v-model="form.useDigits">0-9</el-checkbox>
+              <el-checkbox v-model="form.useSymbols">符号</el-checkbox>
+            </el-form-item>
+          </template>
         </el-form>
         <template #footer>
           <el-button @click="closeForm">取消</el-button>

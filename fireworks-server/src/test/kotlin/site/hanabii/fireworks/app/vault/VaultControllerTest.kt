@@ -161,7 +161,7 @@ class VaultControllerTest {
             .andExpect(jsonPath("$.website").value("github.com"))
             .andExpect(jsonPath("$.username").value("alice"))
             .andExpect(jsonPath("$.counter").value(1))
-            .andExpect(jsonPath("$.password").doesNotExist())
+            .andExpect(jsonPath("$.mode").value("DERIVED"))
 
         mockMvc.perform(get("/api/vault/entries").session(session))
             .andExpect(status().isOk)
@@ -329,9 +329,126 @@ class VaultControllerTest {
             .response.contentAsString
 
         // 比较 password 字段（不能直接比整个 JSON，因为 updatedAt 在 rotate 后变了）
-        val pwd1Password = Regex(""""password":"([^"]+)"""").find(pwd1)!!.groupValues[1]
-        val pwd1ReplayPassword = Regex(""""password":"([^"]+)"""").find(pwd1Replay)!!.groupValues[1]
+        val pwd1Password = Regex(""""password":"([^"]+)""").find(pwd1)!!.groupValues[1]
+        val pwd1ReplayPassword = Regex(""""password":"([^"]+)""").find(pwd1Replay)!!.groupValues[1]
         assert(pwd1Password == pwd1ReplayPassword) { "Historical counter 1 should replay same password" }
+    }
+
+    // ---------- STORED 模式测试 ----------
+
+    @Test
+    fun `创建 STORED 模式条目并查看密码`() {
+        val session = setupVaultAndLogin("主密码")
+
+        mockMvc.perform(
+            post("/api/vault/entries")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"website": "stored.com", "username": "user1", "mode": "STORED", "password": "我的密码"}""")
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.id").exists())
+            .andExpect(jsonPath("$.mode").value("STORED"))
+            .andExpect(jsonPath("$.password").value("我的密码"))
+    }
+
+    @Test
+    fun `STORED 模式条目不支持轮换`() {
+        val session = setupVaultAndLogin("主密码")
+        val id = createStoredEntry(session, "no-rotate.com", "u")
+
+        mockMvc.perform(post("/api/vault/entries/$id/rotate").session(session))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+    }
+
+    @Test
+    fun `STORED 模式条目不支持派生密码`() {
+        val session = setupVaultAndLogin("主密码")
+        val id = createStoredEntry(session, "no-derive.com", "u")
+
+        mockMvc.perform(get("/api/vault/entries/$id/password").session(session))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+    }
+
+    @Test
+    fun `编辑 STORED 模式条目的密码`() {
+        val session = setupVaultAndLogin("主密码")
+        val id = createStoredEntry(session, "edit-stored.com", "u")
+
+        mockMvc.perform(
+            put("/api/vault/entries/$id")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"password": "新密码", "notes": "备注"}""")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.password").value("新密码"))
+            .andExpect(jsonPath("$.notes").value("备注"))
+    }
+
+    // ---------- generate-password ----------
+
+    @Test
+    fun `generate-password 返回默认长度的随机密码`() {
+        val session = setupVaultAndLogin("主密码")
+
+        val result = mockMvc.perform(get("/api/vault/generate-password").session(session))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.password").isString)
+            .andReturn()
+
+        val password = Regex(""""password":"([^"]+)""").find(result.response.contentAsString)!!.groupValues[1]
+        assert(password.length == 16) { "默认密码长度应为 16，实际为 ${password.length}" }
+    }
+
+    @Test
+    fun `generate-password 可指定长度和字符集`() {
+        val session = setupVaultAndLogin("主密码")
+
+        val result = mockMvc.perform(
+            get("/api/vault/generate-password")
+                .session(session)
+                .param("length", "32")
+                .param("lowercase", "true")
+                .param("uppercase", "false")
+                .param("digits", "false")
+                .param("symbols", "false")
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        val password = Regex(""""password":"([^"]+)""").find(result.response.contentAsString)!!.groupValues[1]
+        assert(password.length == 32) { "密码长度应为 32，实际为 ${password.length}" }
+        assert(password.all { it in 'a'..'z' }) { "密码应只包含小写字母" }
+    }
+
+    @Test
+    fun `generate-password 长度超出范围应报错`() {
+        val session = setupVaultAndLogin("主密码")
+
+        mockMvc.perform(
+            get("/api/vault/generate-password")
+                .session(session)
+                .param("length", "100")
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `generate-password 全部字符集关闭应报错`() {
+        val session = setupVaultAndLogin("主密码")
+
+        mockMvc.perform(
+            get("/api/vault/generate-password")
+                .session(session)
+                .param("lowercase", "false")
+                .param("uppercase", "false")
+                .param("digits", "false")
+                .param("symbols", "false")
+        )
+            .andExpect(status().isBadRequest)
     }
 
     // ---------- helpers ----------
@@ -364,6 +481,21 @@ class VaultControllerTest {
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"website": "$website", "username": "$username"}""")
+        )
+            .andExpect(status().isCreated)
+            .andReturn()
+
+        val response = result.response.contentAsString
+        val idMatch = Regex(""""id":(\d+)""").find(response)
+        return idMatch!!.groupValues[1].toLong()
+    }
+
+    private fun createStoredEntry(session: MockHttpSession, website: String, username: String): Long {
+        val result = mockMvc.perform(
+            post("/api/vault/entries")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"website": "$website", "username": "$username", "mode": "STORED", "password": "测试密码"}""")
         )
             .andExpect(status().isCreated)
             .andReturn()

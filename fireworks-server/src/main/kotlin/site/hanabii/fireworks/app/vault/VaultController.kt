@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController
 import site.hanabii.fireworks.app.AppException
 import site.hanabii.fireworks.app.ErrorCode
 import site.hanabii.fireworks.domain.vault.PasswordEntry
+import java.security.SecureRandom
 
 @RestController
 @RequestMapping("/api/vault")
@@ -58,21 +59,18 @@ class VaultController(
 
     @GetMapping("/entries")
     fun listEntries(session: HttpSession): List<PasswordEntry> {
-        vaultService.requireAuth(session)
-        return vaultService.listEntries()
+        return vaultService.listEntries(session)
     }
 
     @PostMapping("/entries")
     @ResponseStatus(HttpStatus.CREATED)
     fun createEntry(@Valid @RequestBody req: EntryRequest, session: HttpSession): PasswordEntry {
-        vaultService.requireAuth(session)
-        return vaultService.addEntry(req.toEntity())
+        return vaultService.addEntry(session, req.toEntity())
     }
 
     @GetMapping("/entries/{id}")
     fun getEntry(@PathVariable id: Long, session: HttpSession): PasswordEntry {
-        vaultService.requireAuth(session)
-        return vaultService.getEntry(id)
+        return vaultService.getEntry(session, id)
             ?: throw AppException(
                 code = ErrorCode.ENTRY_NOT_FOUND,
                 status = HttpStatus.NOT_FOUND,
@@ -82,17 +80,18 @@ class VaultController(
 
     @PutMapping("/entries/{id}")
     fun updateEntry(@PathVariable id: Long, @Valid @RequestBody req: UpdateEntryRequest, session: HttpSession): PasswordEntry {
-        vaultService.requireAuth(session)
-        val existing = vaultService.getEntry(id)
+        val existing = vaultService.getEntry(session, id)
             ?: throw AppException(
                 code = ErrorCode.ENTRY_NOT_FOUND,
                 status = HttpStatus.NOT_FOUND,
                 message = "Entry not found: $id"
             )
-        return vaultService.updateEntry(existing.copy(
+        return vaultService.updateEntry(session, existing.copy(
             website = req.website ?: existing.website,
             username = req.username ?: existing.username,
             notes = req.notes ?: existing.notes,
+            password = req.password ?: existing.password,
+            mode = req.mode ?: existing.mode,
             length = req.length ?: existing.length,
             useLowercase = req.useLowercase ?: existing.useLowercase,
             useUppercase = req.useUppercase ?: existing.useUppercase,
@@ -135,6 +134,30 @@ class VaultController(
             counter = derived.counter
         )
     }
+
+    // ---------- 随机密码生成 ----------
+
+    @GetMapping("/generate-password")
+    fun generatePassword(
+        @RequestParam(defaultValue = "16") length: Int,
+        @RequestParam(defaultValue = "true") lowercase: Boolean,
+        @RequestParam(defaultValue = "true") uppercase: Boolean,
+        @RequestParam(defaultValue = "true") digits: Boolean,
+        @RequestParam(defaultValue = "true") symbols: Boolean
+    ): Map<String, String> {
+        require(length in 8..64) { "length must be 8..64, got $length" }
+        require(lowercase || uppercase || digits || symbols) { "至少需要开启一个字符集" }
+
+        val charset = buildString {
+            if (lowercase) append("abcdefghijklmnopqrstuvwxyz")
+            if (uppercase) append("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+            if (digits) append("0123456789")
+            if (symbols) append("!@#\$%^&*()-_=+[]{};:,.<>?")
+        }
+        val random = SecureRandom()
+        val password = (1..length).map { charset[random.nextInt(charset.length)] }.joinToString("")
+        return mapOf("password" to password)
+    }
 }
 
 // ---------- 请求 / 响应 DTO ----------
@@ -152,6 +175,8 @@ data class EntryRequest(
     val website: String? = null,
     val username: String? = null,
     val notes: String? = null,
+    val password: String? = null,   // 仅 STORED 模式
+    val mode: String? = null,       // "DERIVED" 或 "STORED"
     val counter: Int? = null,
     val length: Int? = null,
     val useLowercase: Boolean? = null,
@@ -163,6 +188,8 @@ data class EntryRequest(
         website = website ?: "",
         username = username ?: "",
         notes = notes ?: "",
+        password = password,
+        mode = mode ?: "DERIVED",
         counter = counter ?: 1,
         length = length ?: 16,
         useLowercase = useLowercase ?: true,
@@ -176,6 +203,8 @@ data class UpdateEntryRequest(
     val website: String? = null,
     val username: String? = null,
     val notes: String? = null,
+    val password: String? = null,   // 仅 STORED 模式
+    val mode: String? = null,       // "DERIVED" 或 "STORED"
     val length: Int? = null,
     val useLowercase: Boolean? = null,
     val useUppercase: Boolean? = null,

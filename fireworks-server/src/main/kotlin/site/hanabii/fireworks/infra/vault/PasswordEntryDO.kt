@@ -11,13 +11,17 @@ import java.time.Instant
 
 /**
  * PasswordEntry 在 SQLite 中的表映射。
- * 派生生成路线：不存密码，只存元数据与生成规则。
+ * 支持两种模式：DERIVED（派生生成）和 STORED（加密存储）。
  */
 object PasswordEntryDO : Table<Nothing>("password_entries") {
     val id = long("id").primaryKey()
     val website = varchar("website")
     val username = varchar("username")
     val notes = varchar("notes")
+    // 存储模式：加密后的密码（AES-GCM + Base64），派生模式为 NULL
+    val password = varchar("password")
+    // 模式标识："DERIVED" 或 "STORED"
+    val mode = varchar("mode")
     val counter = int("counter")
     val length = int("length")
     val useLowercase = int("use_lowercase")
@@ -33,6 +37,8 @@ object PasswordEntryDO : Table<Nothing>("password_entries") {
             website       TEXT    NOT NULL,
             username      TEXT    NOT NULL,
             notes         TEXT,
+            password      TEXT,
+            mode          TEXT    NOT NULL DEFAULT 'DERIVED',
             counter       INTEGER NOT NULL DEFAULT 1,
             length        INTEGER NOT NULL DEFAULT 16,
             use_lowercase INTEGER NOT NULL DEFAULT 1,
@@ -50,6 +56,9 @@ fun QueryRowSet.toPasswordEntry(): PasswordEntry = PasswordEntry(
     website = this[PasswordEntryDO.website] ?: "",
     username = this[PasswordEntryDO.username] ?: "",
     notes = this[PasswordEntryDO.notes] ?: "",
+    // password 可为 NULL（DERIVED 模式），this[...] 返回可空类型
+    password = this[PasswordEntryDO.password],
+    mode = this[PasswordEntryDO.mode] ?: "DERIVED",
     counter = this[PasswordEntryDO.counter] ?: 1,
     length = this[PasswordEntryDO.length] ?: 16,
     useLowercase = this[PasswordEntryDO.useLowercase] == 1,

@@ -43,12 +43,14 @@ springBoot {
     mainClass.set("site.hanabii.fireworks.FireworksApplicationKt")
 }
 
-// processResources 依赖前端构建，确保 dist 在复制前已生成。
-// buildFrontend 配置了 Gradle 增量构建输入输出，若未变更则跳过 npm 编译。
-// dev 模式下（执行 bootRunDev 时）跳过前端构建和静态资源复制，前端由独立 dev server 提供服务。
+// ============================================================
+// 正式模式：构建前端 → 打入 static/ → 启动 Spring Boot :8080
+// ============================================================
+// processResources 在 dev 模式下跳过前端构建，
+// 其他情况（bootRun、bootJar、build 等）自动构建前端并复制到 static/
 tasks.processResources {
-    val isDevMode = gradle.startParameter.taskNames.any { it.contains("Dev", ignoreCase = true) }
-    if (!isDevMode) {
+    val isDev = gradle.startParameter.taskNames.any { it.contains("Dev", ignoreCase = true) }
+    if (!isDev) {
         dependsOn(":fireworks-web:buildFrontend")
         into("static") {
             from("../fireworks-web/dist")
@@ -56,20 +58,27 @@ tasks.processResources {
     }
 }
 
-// debug 模式：同时启动 Spring Boot 后端和 Vue 前端 dev server（带 HMR）
+// ============================================================
+// 开发模式：前端 Vite HMR (:5173) + 后端 :8080
+// ============================================================
+// 前端 dev server 代理 /api → localhost:8080
+// 访问 http://localhost:5173 获得热部署体验
 tasks.register<JavaExec>("bootRunDev") {
     group = "application"
-    description = "Run Spring Boot backend and Vue frontend dev server simultaneously"
+    description = "开发模式：前端热部署 (Vite HMR :5173) + 后端 (:8080)"
 
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("site.hanabii.fireworks.FireworksApplicationKt")
 
-    // 后台启动前端 dev server
     doFirst {
-        println("Starting Vue frontend dev server in background...")
+        val frontendDir = file("../fireworks-web")
+        println("[dev] 启动前端 Vite dev server (HMR)...")
         ProcessBuilder("npm", "run", "dev")
-            .directory(file("../fireworks-web"))
+            .directory(frontendDir)
             .inheritIO()
             .start()
+        // 等 Vite 启动（通常 2-3 秒）
+        Thread.sleep(3000)
+        println("[dev] 后端启动中...")
     }
 }

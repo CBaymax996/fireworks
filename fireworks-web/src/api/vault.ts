@@ -29,6 +29,8 @@ export interface PasswordEntry {
   useUppercase: boolean
   useDigits: boolean
   useSymbols: boolean
+  password: string | null   // 存储模式的密码明文（后端已解密返回）
+  mode: 'DERIVED' | 'STORED' // 密码模式：派生 / 存储
   createdAt: string
   updatedAt: string
 }
@@ -62,6 +64,8 @@ export interface EntryRequest {
   useUppercase?: boolean
   useDigits?: boolean
   useSymbols?: boolean
+  password?: string          // 存储模式的密码原文
+  mode?: 'DERIVED' | 'STORED' // 密码模式
 }
 
 export interface UpdateEntryRequest {
@@ -73,6 +77,8 @@ export interface UpdateEntryRequest {
   useUppercase?: boolean
   useDigits?: boolean
   useSymbols?: boolean
+  password?: string          // 存储模式的密码原文（修改时可选）
+  mode?: 'DERIVED' | 'STORED' // 密码模式（修改时可选）
 }
 
 // ---------- 初始化与认证 ----------
@@ -142,4 +148,25 @@ export function rotateEntry(id: number): Promise<PasswordEntry> {
 export function derivePassword(id: number, counter?: number): Promise<DerivedPasswordResponse> {
   const query = counter != null ? `?counter=${counter}` : ''
   return request<DerivedPasswordResponse>(`/api/vault/entries/${id}/password${query}`)
+}
+
+// ---------- 随机密码生成 ----------
+
+/**
+ * 调用后端生成随机密码
+ */
+export function generatePassword(params: {
+  length?: number
+  lowercase?: boolean
+  uppercase?: boolean
+  digits?: boolean
+  symbols?: boolean
+}): Promise<{ password: string }> {
+  const sp = new URLSearchParams()
+  if (params.length != null) sp.set('length', String(params.length))
+  if (params.lowercase != null) sp.set('lowercase', String(params.lowercase))
+  if (params.uppercase != null) sp.set('uppercase', String(params.uppercase))
+  if (params.digits != null) sp.set('digits', String(params.digits))
+  if (params.symbols != null) sp.set('symbols', String(params.symbols))
+  return request<{ password: string }>(`/api/vault/generate-password?${sp.toString()}`)
 }

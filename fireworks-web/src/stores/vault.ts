@@ -175,6 +175,26 @@ export const useVaultStore = defineStore('vault', () => {
     delete derivedPasswords.value[id]
   }
 
+  // ---------- 随机密码生成 ----------
+
+  /** 调用后端生成随机密码，返回密码字符串 */
+  async function generatePassword(params?: {
+    length?: number
+    lowercase?: boolean
+    uppercase?: boolean
+    digits?: boolean
+    symbols?: boolean
+  }): Promise<string> {
+    error.value = null
+    try {
+      const res = await vaultApi.generatePassword(params ?? {})
+      return res.password
+    } catch (e: any) {
+      error.value = e.message || '生成密码失败'
+      throw e
+    }
+  }
+
   return {
     initialized,
     authenticated,
@@ -196,5 +216,6 @@ export const useVaultStore = defineStore('vault', () => {
     derivePassword,
     getCachedPassword,
     clearPassword,
+    generatePassword,
   }
 })
