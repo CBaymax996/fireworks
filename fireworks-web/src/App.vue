@@ -57,6 +57,11 @@ function handleLogout() {
             :class="{ active: route.path === '/vault' }"
           >密码本</router-link>
           <router-link
+            to="/portfolio"
+            class="fw-nav-link"
+            :class="{ active: route.path === '/portfolio' }"
+          >投资组合</router-link>
+          <router-link
             to="/family-trees"
             class="fw-nav-link"
             :class="{ active: route.path.startsWith('/family-trees') }"

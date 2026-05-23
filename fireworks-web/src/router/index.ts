@@ -44,6 +44,11 @@ const router = createRouter({
       name: 'personEdit',
       component: () => import('../views/PersonEditView.vue'),
     },
+    {
+      path: '/portfolio',
+      name: 'portfolio',
+      component: () => import('../views/PortfolioView.vue'),
+    },
   ],
 })
 
