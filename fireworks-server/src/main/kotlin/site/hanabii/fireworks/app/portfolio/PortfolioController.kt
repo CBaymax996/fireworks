@@ -106,6 +106,16 @@ class PortfolioController(
         return mapOf("message" to "配比已更新: ${req.targetRatio}")
     }
 
+    /** PUT /api/portfolio/{name}/allocations — 批量修改配比 */
+    @PutMapping("/portfolio/{name}/allocations")
+    fun batchUpdateAllocations(
+        @PathVariable name: String,
+        @Valid @RequestBody req: BatchUpdateAllocationsRequest
+    ): Map<String, String> {
+        portfolioService.batchUpdateAllocations(name, req.items.map { it.allocationId to it.targetRatio })
+        return mapOf("message" to "配比已批量更新")
+    }
+
     /** DELETE /api/portfolio/{name}/allocation/{id} — 删除资产 */
     @DeleteMapping("/portfolio/{name}/allocation/{id}")
     fun deleteAllocation(
@@ -262,6 +272,15 @@ data class AddAllocationRequest(
 data class UpdateAllocationRequest(
     @field:Positive(message = "目标配比必须大于 0")
     val targetRatio: Double
+)
+
+data class BatchAllocationItem(
+    val allocationId: Long,
+    val targetRatio: Double
+)
+
+data class BatchUpdateAllocationsRequest(
+    val items: List<BatchAllocationItem>
 )
 
 data class DepositRequest(

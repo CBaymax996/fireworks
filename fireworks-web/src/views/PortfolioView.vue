@@ -1142,7 +1142,7 @@ async function confirmEditAsset() {
 // ── 资产分配器 ──
 
 interface AllocSegment {
-  allocationId?: string
+  allocationId?: number
   name: string
   percent: number
   value: number
@@ -1162,7 +1162,7 @@ const allocTotal = computed(() =>
 function openAdjustRatioDrawer() {
   const colors = assetPieColors
   allocSegments.value = portfolio.assets.map((a, idx) => ({
-    allocationId: (a as any).allocationId as string,
+    allocationId: (a as any).allocationId as number,
     name: a.name,
     color: colors[idx % colors.length],
     percent: Math.round(a.targetRatio * 1000) / 10,
@@ -1276,17 +1276,24 @@ function onPercentInput(idx: number, e: Event) {
 }
 
 async function saveAllocatorRatios() {
+  // 保存前强制标准化：将浮点误差分摊到占比最大的资产，确保总和严格 = 100%
+  const segs = allocSegments.value
+  const total = segs.reduce((s, seg) => s + seg.percent, 0)
+  if (Math.abs(total - 100) > 0.01) {
+    const maxIdx = segs.reduce((maxI, seg, i) => seg.percent > segs[maxI].percent ? i : maxI, 0)
+    segs[maxIdx].percent = Math.round((segs[maxIdx].percent + 100 - total) * 10) / 10
+  }
+
   allocatorSaving.value = true
   try {
-    const assets = portfolio.assets
-    for (let i = 0; i < allocSegments.value.length; i++) {
-      const seg = allocSegments.value[i]
-      const ratio = (seg.percent || 0) / 100
-      await axios.put(
-        `/api/portfolio/${encodeURIComponent(currentPortfolioName.value)}/allocation/${(seg as any).allocationId}`,
-        { targetRatio: ratio }
-      )
-    }
+    const items = segs.map(seg => ({
+      allocationId: seg.allocationId!,
+      targetRatio: Math.round(seg.percent * 100) / 10000
+    }))
+    await axios.put(
+      `/api/portfolio/${encodeURIComponent(currentPortfolioName.value)}/allocations`,
+      { items }
+    )
     ElMessage.success('配比已保存')
     showAllocator.value = false
     await fetchPortfolio()

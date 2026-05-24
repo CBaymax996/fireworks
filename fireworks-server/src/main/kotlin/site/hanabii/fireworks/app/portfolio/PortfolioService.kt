@@ -262,6 +262,28 @@ class PortfolioService(
         portfolioRepository.updatePortfolioRatio(allocationId, targetRatio)
     }
 
+    /** 批量修改配比（一次性校验总和） */
+    fun batchUpdateAllocations(portfolioName: String, items: List<Pair<Long, Double>>) {
+        val totalRatio = items.sumOf { it.second }
+        if (totalRatio > 1.001) {
+            throw AppException(
+                code = ErrorCode.INVALID_REQUEST,
+                status = HttpStatus.BAD_REQUEST,
+                message = "配比总和超过 100%（合计 ${formatPercent(totalRatio)}）"
+            )
+        }
+        for ((allocationId, targetRatio) in items) {
+            if (targetRatio < 0) {
+                throw AppException(
+                    code = ErrorCode.INVALID_REQUEST,
+                    status = HttpStatus.BAD_REQUEST,
+                    message = "配比不能为负数"
+                )
+            }
+            portfolioRepository.updatePortfolioRatio(allocationId, targetRatio)
+        }
+    }
+
     /** 删除资产配比及对应持仓 */
     fun deleteAllocation(portfolioName: String, allocationId: Long) {
         val alloc = portfolioRepository.findPortfolioById(allocationId)
