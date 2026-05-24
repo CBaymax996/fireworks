@@ -1,0 +1,212 @@
+# ===== 族谱列表与详情 =====
+
+query FamilyTrees {
+  familyTrees {
+    id
+    name
+    description
+    createdAt
+    updatedAt
+  }
+}
+
+query FamilyTree($id: Int!) {
+  familyTree(id: $id) {
+    id
+    name
+    description
+    createdAt
+    updatedAt
+  }
+}
+
+# ===== 族谱 CRUD =====
+
+mutation CreateFamilyTree($name: String!, $description: String) {
+  createFamilyTree(name: $name, description: $description) {
+    id
+    name
+    description
+    createdAt
+    updatedAt
+  }
+}
+
+mutation UpdateFamilyTree($id: Int!, $name: String, $description: String) {
+  updateFamilyTree(id: $id, name: $name, description: $description) {
+    id
+    name
+    description
+    createdAt
+    updatedAt
+  }
+}
+
+mutation DeleteFamilyTree($id: Int!) {
+  deleteFamilyTree(id: $id)
+}
+
+# ===== 成员查询 =====
+
+query FamilyPersons($treeId: Int!, $search: String) {
+  familyPersons(treeId: $treeId, search: $search) {
+    id
+    familyTreeId
+    name
+    gender
+    birthDate
+    deathDate
+    biography
+    fatherId
+    generationOrder
+    sortOrder
+    createdAt
+    updatedAt
+  }
+}
+
+query FamilyPerson($treeId: Int!, $personId: Int!) {
+  familyPerson(treeId: $treeId, personId: $personId) {
+    id
+    familyTreeId
+    name
+    gender
+    birthDate
+    deathDate
+    biography
+    fatherId
+    generationOrder
+    sortOrder
+    createdAt
+    updatedAt
+  }
+}
+
+query FamilyRoots($treeId: Int!) {
+  familyRoots(treeId: $treeId) {
+    id
+    familyTreeId
+    name
+    gender
+    birthDate
+    deathDate
+    biography
+    fatherId
+    generationOrder
+    sortOrder
+    createdAt
+    updatedAt
+  }
+}
+
+query FamilyChildren($treeId: Int!, $personId: Int!) {
+  familyChildren(treeId: $treeId, personId: $personId) {
+    person {
+      id
+      name
+      gender
+      birthDate
+      deathDate
+      biography
+      fatherId
+      generationOrder
+      sortOrder
+      spouse {
+        id
+        name
+      }
+    }
+    children {
+      id
+      name
+      gender
+      sortOrder
+      hasChildren
+    }
+  }
+}
+
+query FamilyAncestors($treeId: Int!, $personId: Int!) {
+  familyAncestors(treeId: $treeId, personId: $personId) {
+    id
+    familyTreeId
+    name
+    gender
+    birthDate
+    deathDate
+    biography
+    fatherId
+    generationOrder
+    sortOrder
+    createdAt
+    updatedAt
+  }
+}
+
+query FamilySpouses($treeId: Int!, $husbandId: Int!) {
+  familySpouses(treeId: $treeId, husbandId: $husbandId) {
+    id
+    husbandId
+    wifeId
+    marriageOrder
+    isPrimary
+    createdAt
+  }
+}
+
+# ===== 成员 CRUD =====
+
+mutation CreateFamilyPerson($treeId: Int!, $input: FamilyPersonInput!) {
+  createFamilyPerson(treeId: $treeId, input: $input) {
+    id
+    familyTreeId
+    name
+    gender
+    birthDate
+    deathDate
+    biography
+    fatherId
+    generationOrder
+    sortOrder
+    createdAt
+    updatedAt
+  }
+}
+
+mutation UpdateFamilyPerson($treeId: Int!, $personId: Int!, $input: FamilyPersonUpdateInput!) {
+  updateFamilyPerson(treeId: $treeId, personId: $personId, input: $input) {
+    id
+    familyTreeId
+    name
+    gender
+    birthDate
+    deathDate
+    biography
+    fatherId
+    generationOrder
+    sortOrder
+    createdAt
+    updatedAt
+  }
+}
+
+mutation DeleteFamilyPerson($treeId: Int!, $personId: Int!) {
+  deleteFamilyPerson(treeId: $treeId, personId: $personId)
+}
+
+# ===== 配偶操作 =====
+
+mutation AddSpouse($treeId: Int!, $husbandId: Int!, $wifeId: Int!, $isPrimary: Boolean) {
+  addSpouse(treeId: $treeId, husbandId: $husbandId, wifeId: $wifeId, isPrimary: $isPrimary) {
+    id
+    husbandId
+    wifeId
+    marriageOrder
+    isPrimary
+    createdAt
+  }
+}
+
+mutation RemoveSpouse($treeId: Int!, $husbandId: Int!, $spouseId: Int!) {
+  removeSpouse(treeId: $treeId, husbandId: $husbandId, spouseId: $spouseId)
+}

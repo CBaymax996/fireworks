@@ -1,0 +1,31 @@
+# ===== Auth =====
+
+query AuthStatus {
+  authStatus {
+    authenticated
+    accountId
+  }
+}
+
+mutation Register($username: String!, $password: String!) {
+  register(username: $username, password: $password) {
+    id
+    username
+    createdAt
+  }
+}
+
+mutation Login($username: String!, $password: String!) {
+  login(username: $username, password: $password) {
+    success
+    account {
+      id
+      username
+      createdAt
+    }
+  }
+}
+
+mutation Logout {
+  logout
+}

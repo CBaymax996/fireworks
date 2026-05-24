@@ -1,0 +1,151 @@
+# ===== Vault 状态 =====
+
+query VaultStatus {
+  vaultStatus {
+    initialized
+    authenticated
+  }
+}
+
+# ===== Vault 认证 =====
+
+mutation VaultSetup($masterPassword: String!) {
+  vaultSetup(masterPassword: $masterPassword)
+}
+
+mutation VaultLogin($masterPassword: String!) {
+  vaultLogin(masterPassword: $masterPassword)
+}
+
+mutation VaultLogout {
+  vaultLogout
+}
+
+# ===== 密码条目 CRUD =====
+
+query VaultEntries {
+  vaultEntries {
+    id
+    website
+    username
+    notes
+    counter
+    length
+    useLowercase
+    useUppercase
+    useDigits
+    useSymbols
+    password
+    mode
+    createdAt
+    updatedAt
+  }
+}
+
+query VaultEntry($id: Int!) {
+  vaultEntry(id: $id) {
+    id
+    website
+    username
+    notes
+    counter
+    length
+    useLowercase
+    useUppercase
+    useDigits
+    useSymbols
+    password
+    mode
+    createdAt
+    updatedAt
+  }
+}
+
+mutation CreateVaultEntry($input: VaultEntryInput!) {
+  createVaultEntry(input: $input) {
+    id
+    website
+    username
+    notes
+    counter
+    length
+    useLowercase
+    useUppercase
+    useDigits
+    useSymbols
+    password
+    mode
+    createdAt
+    updatedAt
+  }
+}
+
+mutation UpdateVaultEntry($id: Int!, $input: VaultEntryUpdateInput!) {
+  updateVaultEntry(id: $id, input: $input) {
+    id
+    website
+    username
+    notes
+    counter
+    length
+    useLowercase
+    useUppercase
+    useDigits
+    useSymbols
+    password
+    mode
+    createdAt
+    updatedAt
+  }
+}
+
+mutation DeleteVaultEntry($id: Int!) {
+  deleteVaultEntry(id: $id)
+}
+
+mutation RotateVaultEntry($id: Int!) {
+  rotateVaultEntry(id: $id) {
+    id
+    website
+    username
+    notes
+    counter
+    length
+    useLowercase
+    useUppercase
+    useDigits
+    useSymbols
+    password
+    mode
+    createdAt
+    updatedAt
+  }
+}
+
+# ===== 派生与生成 =====
+
+query DerivePassword($id: Int!, $counter: Int) {
+  derivePassword(id: $id, counter: $counter) {
+    entry {
+      id
+      website
+      username
+      notes
+      counter
+      length
+      useLowercase
+      useUppercase
+      useDigits
+      useSymbols
+      mode
+    }
+    password
+    counter
+  }
+}
+
+query GeneratePassword($length: Int!, $lowercase: Boolean!, $uppercase: Boolean!, $digits: Boolean!, $symbols: Boolean!) {
+  generatePassword(length: $length, lowercase: $lowercase, uppercase: $uppercase, digits: $digits, symbols: $symbols) {
+    password
+  }
+}

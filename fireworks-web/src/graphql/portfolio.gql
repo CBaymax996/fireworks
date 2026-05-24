@@ -1,0 +1,219 @@
+# ===== 组合列表 =====
+
+query Portfolios {
+  portfolios {
+    id
+    name
+    totalNav
+    assetCount
+  }
+}
+
+# ===== 单个组合详情 =====
+
+query Portfolio($name: String!) {
+  portfolio(name: $name) {
+    id
+    name
+    totalNav
+    totalCost
+    totalProfit
+    totalProfitRate
+    cash
+    holdings {
+      allocationId
+      code
+      name
+      assetType
+      targetRatio
+      actualRatio
+      shares
+      avgCost
+      currentPrice
+      marketValue
+      profit
+      profitRate
+    }
+  }
+}
+
+# ===== NAV 历史 =====
+
+query NavHistory($name: String!, $days: Int) {
+  navHistory(name: $name, days: $days) {
+    portfolioName
+    data {
+      date
+      nav
+    }
+  }
+}
+
+# ===== Tushare 搜索 =====
+
+query TushareSearch($keyword: String!) {
+  tushareSearch(keyword: $keyword) {
+    code
+    name
+    assetType
+  }
+}
+
+# ===== 创建/删除/重命名组合 =====
+
+mutation CreatePortfolio($name: String!) {
+  createPortfolio(name: $name) {
+    id
+    name
+    totalNav
+    assetCount
+  }
+}
+
+mutation DeletePortfolio($name: String!) {
+  deletePortfolio(name: $name)
+}
+
+mutation RenamePortfolio($name: String!, $newName: String!) {
+  renamePortfolio(name: $name, newName: $newName)
+}
+
+# ===== 资产配置 =====
+
+query Allocation($name: String!) {
+  allocation(name: $name) {
+    id
+    code
+    name
+    assetType
+    targetRatio
+  }
+}
+
+mutation AddAllocation($name: String!, $code: String!, $assetName: String!, $assetType: String, $targetRatio: Float!) {
+  addAllocation(name: $name, code: $code, assetName: $assetName, assetType: $assetType, targetRatio: $targetRatio) {
+    id
+    code
+    name
+    assetType
+    targetRatio
+  }
+}
+
+mutation UpdateAllocation($name: String!, $allocationId: Int!, $targetRatio: Float!) {
+  updateAllocation(name: $name, allocationId: $allocationId, targetRatio: $targetRatio)
+}
+
+mutation DeleteAllocation($name: String!, $allocationId: Int!) {
+  deleteAllocation(name: $name, allocationId: $allocationId)
+}
+
+# ===== 出入金 =====
+
+mutation Deposit($name: String!, $amount: Float!) {
+  deposit(name: $name, amount: $amount) {
+    id
+    name
+    totalNav
+    totalCost
+    totalProfit
+    totalProfitRate
+    cash
+    holdings {
+      allocationId
+      code
+      name
+      assetType
+      targetRatio
+      actualRatio
+      shares
+      avgCost
+      currentPrice
+      marketValue
+      profit
+      profitRate
+    }
+  }
+}
+
+mutation Withdraw($name: String!, $allocationId: Int!, $shares: Int!) {
+  withdraw(name: $name, allocationId: $allocationId, shares: $shares) {
+    id
+    name
+    totalNav
+    totalCost
+    totalProfit
+    totalProfitRate
+    cash
+    holdings {
+      allocationId
+      code
+      name
+      assetType
+      targetRatio
+      actualRatio
+      shares
+      avgCost
+      currentPrice
+      marketValue
+      profit
+      profitRate
+    }
+  }
+}
+
+# ===== 再平衡 =====
+
+mutation RebalancePreview($name: String!) {
+  rebalancePreview(name: $name) {
+    portfolioName
+    targetNav
+    operations {
+      allocationId
+      code
+      name
+      assetType
+      targetRatio
+      currentRatio
+      diff
+      action
+      shares
+    }
+    executed
+  }
+}
+
+mutation RebalanceExecute($name: String!, $operations: [RebalanceOpInput!]!) {
+  rebalanceExecute(name: $name, operations: $operations) {
+    portfolioName
+    targetNav
+    operations {
+      allocationId
+      code
+      name
+      assetType
+      targetRatio
+      currentRatio
+      diff
+      action
+      shares
+    }
+    executed
+  }
+}
+
+# ===== 价格同步 =====
+
+mutation SyncPrices($name: String!, $codes: [String!]) {
+  syncPrices(name: $name, codes: $codes) {
+    portfolioName
+    successCount
+    totalCount
+    results {
+      code
+      name
+      price
+      error
+    }
+  }
+}
