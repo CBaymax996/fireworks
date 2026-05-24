@@ -110,9 +110,29 @@ class PortfolioController(
     @PutMapping("/portfolio/{name}/allocations")
     fun batchUpdateAllocations(
         @PathVariable name: String,
-        @Valid @RequestBody req: BatchUpdateAllocationsRequest
+        @RequestBody req: Map<String, List<Map<String, Any>>>
     ): Map<String, String> {
-        portfolioService.batchUpdateAllocations(name, req.items.map { it.allocationId to it.targetRatio })
+        val items = req["items"] ?: throw AppException(
+            code = ErrorCode.INVALID_REQUEST,
+            status = HttpStatus.BAD_REQUEST,
+            message = "请求体缺少 items 字段"
+        )
+        val pairs = items.map { item ->
+            val id = (item["allocationId"] as? Number)?.toLong()
+                ?: throw AppException(
+                    code = ErrorCode.INVALID_REQUEST,
+                    status = HttpStatus.BAD_REQUEST,
+                    message = "缺少 allocationId"
+                )
+            val ratio = (item["targetRatio"] as? Number)?.toDouble()
+                ?: throw AppException(
+                    code = ErrorCode.INVALID_REQUEST,
+                    status = HttpStatus.BAD_REQUEST,
+                    message = "缺少 targetRatio"
+                )
+            id to ratio
+        }
+        portfolioService.batchUpdateAllocations(name, pairs)
         return mapOf("message" to "配比已批量更新")
     }
 
