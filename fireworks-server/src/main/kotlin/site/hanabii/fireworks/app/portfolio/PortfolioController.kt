@@ -14,10 +14,13 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import org.slf4j.LoggerFactory
 import site.hanabii.fireworks.app.AppException
 import site.hanabii.fireworks.app.ErrorCode
 import site.hanabii.fireworks.domain.portfolio.Portfolio
+import site.hanabii.fireworks.infra.config.TraceIdFilter
 import org.springframework.http.HttpStatus
+import jakarta.servlet.http.HttpServletRequest
 
 /**
  * 投资组合 V2 REST 控制器。
@@ -30,6 +33,7 @@ class PortfolioController(
     private val portfolioService: PortfolioService,
     private val tushareService: TushareService
 ) {
+    private val logger = LoggerFactory.getLogger(PortfolioController::class.java)
 
     // ==================== 组合列表管理（无 name 前缀） ====================
 
@@ -110,30 +114,45 @@ class PortfolioController(
     @PutMapping("/portfolio/{name}/allocations")
     fun batchUpdateAllocations(
         @PathVariable name: String,
-        @RequestBody req: Map<String, List<Map<String, Any>>>
+        @RequestBody req: Map<String, List<Map<String, Any>>>,
+        request: HttpServletRequest
     ): Map<String, String> {
-        val items = req["items"] ?: throw AppException(
-            code = ErrorCode.INVALID_REQUEST,
-            status = HttpStatus.BAD_REQUEST,
-            message = "请求体缺少 items 字段"
-        )
-        val pairs = items.map { item ->
-            val id = (item["allocationId"] as? Number)?.toLong()
-                ?: throw AppException(
-                    code = ErrorCode.INVALID_REQUEST,
-                    status = HttpStatus.BAD_REQUEST,
-                    message = "缺少 allocationId"
-                )
-            val ratio = (item["targetRatio"] as? Number)?.toDouble()
-                ?: throw AppException(
-                    code = ErrorCode.INVALID_REQUEST,
-                    status = HttpStatus.BAD_REQUEST,
-                    message = "缺少 targetRatio"
-                )
-            id to ratio
+        val traceId = request.getAttribute(TraceIdFilter.TRACE_ID_ATTR) as? String ?: "unknown"
+        try {
+            val items = req["items"] ?: throw AppException(
+                code = ErrorCode.INVALID_REQUEST,
+                status = HttpStatus.BAD_REQUEST,
+                message = "请求体缺少 items 字段"
+            )
+            logger.info("[$traceId] batchUpdateAllocations: name=$name, itemCount=${items.size}")
+            val pairs = items.map { item ->
+                val id = (item["allocationId"] as? Number)?.toLong()
+                    ?: throw AppException(
+                        code = ErrorCode.INVALID_REQUEST,
+                        status = HttpStatus.BAD_REQUEST,
+                        message = "缺少 allocationId"
+                    )
+                val ratio = (item["targetRatio"] as? Number)?.toDouble()
+                    ?: throw AppException(
+                        code = ErrorCode.INVALID_REQUEST,
+                        status = HttpStatus.BAD_REQUEST,
+                        message = "缺少 targetRatio"
+                    )
+                logger.info("[$traceId] item: allocationId=$id, targetRatio=$ratio")
+                id to ratio
+            }
+            portfolioService.batchUpdateAllocations(name, pairs)
+            return mapOf("message" to "配比已批量更新")
+        } catch (e: AppException) {
+            throw e
+        } catch (e: Exception) {
+            logger.error("[$traceId] 批量更新配比失败: ${e.message}", e)
+            throw AppException(
+                code = ErrorCode.INTERNAL_ERROR,
+                status = HttpStatus.INTERNAL_SERVER_ERROR,
+                message = "服务器内部错误 [$traceId]"
+            )
         }
-        portfolioService.batchUpdateAllocations(name, pairs)
-        return mapOf("message" to "配比已批量更新")
     }
 
     /** DELETE /api/portfolio/{name}/allocation/{id} — 删除资产 */

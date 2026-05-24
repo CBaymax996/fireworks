@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
+import site.hanabii.fireworks.infra.config.TraceIdFilter
 import java.time.Instant
 
 @RestControllerAdvice
@@ -19,7 +20,8 @@ class GlobalExceptionHandler {
             ErrorResponse(
                 code = ex.code.name,
                 message = ex.message,
-                path = request.requestURI
+                path = request.requestURI,
+                traceId = request.getAttribute(TraceIdFilter.TRACE_ID_ATTR) as? String
             )
         )
     }
@@ -34,7 +36,8 @@ class GlobalExceptionHandler {
                 code = ErrorCode.INVALID_REQUEST.name,
                 message = message,
                 path = request.requestURI,
-                timestamp = Instant.now()
+                timestamp = Instant.now(),
+                traceId = request.getAttribute(TraceIdFilter.TRACE_ID_ATTR) as? String
             )
         )
     }
@@ -49,7 +52,8 @@ class GlobalExceptionHandler {
             ErrorResponse(
                 code = ErrorCode.INVALID_REQUEST.name,
                 message = ex.message ?: "Invalid request",
-                path = request.requestURI
+                path = request.requestURI,
+                traceId = request.getAttribute(TraceIdFilter.TRACE_ID_ATTR) as? String
             )
         )
     }
@@ -61,7 +65,8 @@ class GlobalExceptionHandler {
             ErrorResponse(
                 code = ErrorCode.INTERNAL_ERROR.name,
                 message = "Internal server error",
-                path = request.requestURI
+                path = request.requestURI,
+                traceId = request.getAttribute(TraceIdFilter.TRACE_ID_ATTR) as? String
             )
         )
     }
