@@ -562,7 +562,8 @@ class PortfolioService(
                             holdingId = holding.id!!,
                             source = "tushare",
                             price = tusharePrice.price,
-                            recordedAt = tusharePrice.tradeDate.atStartOfDay(ZoneId.systemDefault()).toInstant()
+                            recordedAt = tusharePrice.tradeDate.atStartOfDay(ZoneId.systemDefault()).toInstant(),
+                            name = alloc.name
                         )
                     )
                     details.add(

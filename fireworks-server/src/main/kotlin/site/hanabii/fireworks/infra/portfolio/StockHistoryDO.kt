@@ -20,14 +20,16 @@ object StockHistoryDO : Table<Nothing>("stock_history") {
     val source = varchar("source")
     val price = double("price")
     val recordedAt = timestamp("recorded_at")
+    val name = varchar("name")
 
     const val DDL: String = """
         CREATE TABLE IF NOT EXISTS stock_history (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             holding_id    INTEGER NOT NULL,
-            source        TEXT    NOT NULL DEFAULT 'tushare',
+            source        TEXT    NOT NULL,
             price         REAL    NOT NULL,
-            recorded_at   TIMESTAMP NOT NULL
+            recorded_at   TIMESTAMP NOT NULL,
+            name          TEXT
         )
     """
 }
@@ -37,5 +39,6 @@ fun QueryRowSet.toStockPrice(): StockPrice = StockPrice(
     holdingId = this[StockHistoryDO.holdingId] ?: 0,
     source = this[StockHistoryDO.source] ?: "tushare",
     price = this[StockHistoryDO.price] ?: 0.0,
-    recordedAt = this[StockHistoryDO.recordedAt] ?: Instant.now()
+    recordedAt = this[StockHistoryDO.recordedAt] ?: Instant.now(),
+    name = this[StockHistoryDO.name]
 )

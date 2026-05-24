@@ -46,6 +46,12 @@ class SchemaInitializer(
                 stmt.execute(PortfolioDO.DDL.trimIndent())
                 stmt.execute(PortfolioHoldingDO.DDL.trimIndent())
                 stmt.execute(StockHistoryDO.DDL.trimIndent())
+                // 迁移：为已有 stock_history 表添加 name 列
+                try {
+                    stmt.execute("ALTER TABLE stock_history ADD COLUMN name TEXT")
+                } catch (_: Exception) {
+                    // 列已存在则忽略
+                }
                 stmt.execute(PortfolioSnapshotDO.DDL.trimIndent())
             }
         }

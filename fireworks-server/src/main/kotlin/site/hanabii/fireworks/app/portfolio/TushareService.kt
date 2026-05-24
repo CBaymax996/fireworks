@@ -16,11 +16,16 @@ import site.hanabii.fireworks.app.AppException
 import site.hanabii.fireworks.app.ErrorCode
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 /**
  * tushare 行情数据服务。
  * 负责调用 tushare HTTP API 获取 ETF 每日收盘价。
  * 免费版 fund_daily 限频 1 次/小时，批量拉取所有资产。
+ *
+ * fund_basic / stock_basic 每日限 5 次调用，故缓存到内存，
+ * 首次请求拉取全量数据，后续搜索从缓存过滤。
  */
 @Service
 class TushareService(
@@ -38,18 +43,30 @@ class TushareService(
         }
     )
 
+    // ==================== 搜索数据缓存 ====================
+    // fund_basic / stock_basic 每日仅 5 次调用，必须缓存避免每次按键都请求
+
+    private data class CachedList(
+        val items: List<TushareSearchResult>,
+        val fetchDate: LocalDate
+    )
+
+    private val cacheLock = ReentrantLock()
+    @Volatile private var fundCache: CachedList? = null
+    @Volatile private var stockCache: CachedList? = null
+
     /**
      * 将资产代码映射为 tushare ts_code。
-     * 以 5 开头的 6 位代码 → .SH（上交所 ETF），以 0/3 开头的 6 位代码 → .SZ（深交所）。
+     * 5/6 开头 → .SH（上交所），0/1/2/3 开头 → .SZ（深交所）。
      * 若已包含 "." 后缀则原样返回。
      */
     fun toTsCode(code: String): String {
         if (code.contains(".")) return code
         require(code.length == 6) { "无效的资产代码: $code，应为 6 位数字" }
         return when (code.first()) {
-            '5' -> "$code.SH"
-            '0', '3' -> "$code.SZ"
-            else -> throw IllegalArgumentException("无法识别的资产代码: $code（期望以 5/0/3 开头）")
+            '5', '6' -> "$code.SH"
+            '0', '1', '2', '3' -> "$code.SZ"
+            else -> throw IllegalArgumentException("无法识别的资产代码: $code（期望以 5/6/0/1/2/3 开头）")
         }
     }
 
@@ -142,115 +159,135 @@ class TushareService(
     }
 
     /**
-     * 代码联想搜索：根据 keyword 搜索 ETF（fund_basic + stock_basic）。
-     * 先在 fund_basic 中搜索上交所 ETF（market=E），再在 stock_basic 中搜索股票。
-     * @param keyword 搜索关键词（代码或名称片段）
-     * @return 匹配的资产列表
+     * 代码联想搜索：根据 keyword 在缓存的 fund/stock 全量数据中模糊匹配。
+     * 首次调用时从 tushare 拉取全量数据缓存，当天后续调用直接从缓存过滤。
      */
     fun searchAsset(keyword: String): List<TushareSearchResult> {
         if (keyword.isBlank()) return emptyList()
 
+        val keywordLower = keyword.lowercase()
         val results = mutableListOf<TushareSearchResult>()
 
-        // 1. 搜索 ETF（fund_basic，上交所 ETF market=E）
-        try {
-            val etfResults = searchFundBasic(keyword)
-            results.addAll(etfResults)
-        } catch (e: Exception) {
-            logger.warn("搜索 fund_basic 失败: ${e.message}", e)
+        for (item in getFundCache()) {
+            if (item.code.contains(keywordLower) || item.name.lowercase().contains(keywordLower)) {
+                results.add(item)
+                if (results.size >= 20) return results
+            }
         }
 
-        // 2. 搜索股票（stock_basic）
-        try {
-            val stockResults = searchStockBasic(keyword)
-            results.addAll(stockResults)
-        } catch (e: Exception) {
-            logger.warn("搜索 stock_basic 失败: ${e.message}", e)
+        for (item in getStockCache()) {
+            if (item.code.contains(keywordLower) || item.name.lowercase().contains(keywordLower)) {
+                results.add(item)
+                if (results.size >= 20) return results
+            }
         }
 
-        // 去重（按 code）
+        return results
+    }
+
+    /** 获取 ETF 缓存数据，过期自动刷新 */
+    private fun getFundCache(): List<TushareSearchResult> {
+        val cached = fundCache
+        if (cached != null && cached.fetchDate == LocalDate.now()) {
+            return cached.items
+        }
+        return cacheLock.withLock {
+            // 双重检查
+            val inside = fundCache
+            if (inside != null && inside.fetchDate == LocalDate.now()) {
+                return@withLock inside.items
+            }
+            val items = fetchAllFund()
+            fundCache = CachedList(items, LocalDate.now())
+            logger.info("fund_basic 缓存已刷新: ${items.size} 条")
+            items
+        }
+    }
+
+    /** 获取股票缓存数据，过期自动刷新 */
+    private fun getStockCache(): List<TushareSearchResult> {
+        val cached = stockCache
+        if (cached != null && cached.fetchDate == LocalDate.now()) {
+            return cached.items
+        }
+        return cacheLock.withLock {
+            val inside = stockCache
+            if (inside != null && inside.fetchDate == LocalDate.now()) {
+                return@withLock inside.items
+            }
+            val items = fetchAllStocks()
+            stockCache = CachedList(items, LocalDate.now())
+            logger.info("stock_basic 缓存已刷新: ${items.size} 条")
+            items
+        }
+    }
+
+    /** 从 tushare 拉取全量 ETF 数据（上交所+深交所） */
+    private fun fetchAllFund(): List<TushareSearchResult> {
+        val results = mutableListOf<TushareSearchResult>()
+        // 上交所 ETF（market=E）和深交所 ETF（market=SE）
+        for (market in listOf("E", "SE")) {
+            try {
+                val requestBody = mapOf(
+                    "api_name" to "fund_basic",
+                    "token" to token,
+                    "params" to mapOf("market" to market),
+                    "fields" to "ts_code,name"
+                )
+                val headers = HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
+                val entity = HttpEntity(objectMapper.writeValueAsString(requestBody), headers)
+                val responseBody = restTemplate.exchange(baseUrl, HttpMethod.POST, entity, String::class.java).body
+                    ?: continue
+                results.addAll(parseAllResults(responseBody, "ETF"))
+            } catch (e: Exception) {
+                logger.warn("tushare fund_basic(market=$market) 拉取失败: ${e.message}")
+            }
+        }
         return results.distinctBy { it.code }
     }
 
-    /** 搜索 fund_basic（ETF） */
-    private fun searchFundBasic(keyword: String): List<TushareSearchResult> {
-        val requestBody = mapOf(
-            "api_name" to "fund_basic",
-            "token" to token,
-            "params" to mapOf("market" to "E"),
-            "fields" to "ts_code,name"
-        )
-
-        val headers = HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
-        val entity = HttpEntity(objectMapper.writeValueAsString(requestBody), headers)
-
-        val responseBody: String = try {
-            restTemplate.exchange(baseUrl, HttpMethod.POST, entity, String::class.java).body
+    /** 从 tushare 拉取全量上市股票数据 */
+    private fun fetchAllStocks(): List<TushareSearchResult> {
+        return try {
+            val requestBody = mapOf(
+                "api_name" to "stock_basic",
+                "token" to token,
+                "params" to mapOf("list_status" to "L"),
+                "fields" to "ts_code,name"
+            )
+            val headers = HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
+            val entity = HttpEntity(objectMapper.writeValueAsString(requestBody), headers)
+            val responseBody = restTemplate.exchange(baseUrl, HttpMethod.POST, entity, String::class.java).body
                 ?: return emptyList()
-        } catch (e: RestClientException) {
-            logger.error("tushare fund_basic 请求失败: keyword=$keyword", e)
-            return emptyList()
+            parseAllResults(responseBody, "STOCK")
+        } catch (e: Exception) {
+            logger.warn("tushare stock_basic 拉取失败: ${e.message}")
+            emptyList()
         }
-
-        return parseSearchResults(responseBody, keyword, "ETF")
     }
 
-    /** 搜索 stock_basic（股票） */
-    private fun searchStockBasic(keyword: String): List<TushareSearchResult> {
-        val requestBody = mapOf(
-            "api_name" to "stock_basic",
-            "token" to token,
-            "params" to mapOf("list_status" to "L"),
-            "fields" to "ts_code,name"
-        )
-
-        val headers = HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
-        val entity = HttpEntity(objectMapper.writeValueAsString(requestBody), headers)
-
-        val responseBody: String = try {
-            restTemplate.exchange(baseUrl, HttpMethod.POST, entity, String::class.java).body
-                ?: return emptyList()
-        } catch (e: RestClientException) {
-            logger.error("tushare stock_basic 请求失败: keyword=$keyword", e)
-            return emptyList()
-        }
-
-        return parseSearchResults(responseBody, keyword, "STOCK")
-    }
-
-    /** 解析 tushare 搜索结果，按 code 或 name 模糊匹配 */
-    private fun parseSearchResults(responseBody: String, keyword: String, type: String): List<TushareSearchResult> {
+    /** 解析 tushare 全量数据响应为 SearchResult 列表（不做关键词过滤） */
+    private fun parseAllResults(responseBody: String, type: String): List<TushareSearchResult> {
         val root = objectMapper.readTree(responseBody)
         val respCode = root.get("code")?.asInt() ?: -1
-        if (respCode != 0) return emptyList()
+        if (respCode != 0) {
+            val msg = root.get("msg")?.asText() ?: "未知错误"
+            logger.warn("tushare $type 返回错误: code=$respCode, msg=$msg")
+            return emptyList()
+        }
 
         val data = root.get("data")
         val items = data?.get("items")
         if (items == null || !items.isArray || items.size() == 0) return emptyList()
 
         val results = mutableListOf<TushareSearchResult>()
-        val keywordLower = keyword.lowercase()
-
         for (i in 0 until items.size()) {
             val item = items[i]
             val tsCode = item[0].asText()
             val name = item[1].asText()
-
-            // 从 ts_code 提取短代码（去掉 .SH / .SZ 后缀）
             val shortCode = tsCode.substringBefore(".")
-
-            // 模糊匹配：关键词匹配代码或名称
-            if (shortCode.contains(keywordLower) || name.lowercase().contains(keywordLower)) {
-                results.add(TushareSearchResult(
-                    code = shortCode,
-                    name = name,
-                    type = type
-                ))
-            }
-
-            if (results.size >= 20) break  // 限制结果数量
+            results.add(TushareSearchResult(code = shortCode, name = name, type = type))
         }
-
         return results
     }
 

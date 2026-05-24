@@ -181,6 +181,7 @@ class PortfolioRepositoryImpl(
             set(it.source, price.source)
             set(it.price, price.price)
             set(it.recordedAt, price.recordedAt)
+            set(it.name, price.name)
         }
         val lastId = lastInsertId()
         return price.copy(id = lastId)

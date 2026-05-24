@@ -29,6 +29,10 @@ dependencies {
 
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6")
 
+    // GraphQL — schema-generator 代码优先 + Spring for GraphQL HTTP 层
+    implementation("com.expediagroup:graphql-kotlin-schema-generator:8.5.0")
+    implementation("org.springframework.boot:spring-boot-starter-graphql")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")

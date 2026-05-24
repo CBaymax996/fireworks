@@ -87,7 +87,7 @@
           v-for="(asset, idx) in portfolio.assets"
           :key="asset.allocationId"
           class="asset-card"
-          :style="Math.abs(asset.deviation) >= 0.05 ? { borderColor: '#ffe8cc' } : {}"
+          :style="Math.abs(asset.deviation) >= 0.05 ? { borderColor: '#fed7aa' } : {}"
         >
           <div class="card-header">
             <span class="name">
@@ -514,59 +514,79 @@
       </div>
     </div>
 
-    <!-- 调整比例抽屉 -->
-    <el-drawer
-      v-model="showAdjustDrawer"
+    <!-- 资产分配器弹窗 -->
+    <el-dialog
+      v-model="showAllocator"
       title="调整配比"
-      direction="rtl"
-      size="420px"
+      width="580px"
       :close-on-click-modal="true"
+      destroy-on-close
     >
-      <div class="drawer-body">
-        <div
-          v-for="(asset, idx) in portfolio.assets"
-          :key="asset.allocationId"
-          class="drawer-asset-row"
-        >
-          <div class="drawer-asset-label">
-            <span class="asset-dot" :class="dotColors[idx % dotColors.length]"></span>
-            <span class="drawer-asset-name">{{ asset.name }}</span>
-            <span class="drawer-asset-code">{{ asset.code }}</span>
-          </div>
-          <div class="drawer-slider-wrap">
-            <el-slider
-              v-model="drawerRatios[idx]"
-              :min="0"
-              :max="100"
-              :step="0.1"
-              show-input
-              :show-input-controls="false"
-              size="small"
-            />
+      <div class="allocator-body">
+
+        <!-- 金条 + 分割线 -->
+        <div class="allocator-bar-wrapper">
+          <div class="allocator-bar" ref="allocBarRef">
+            <template v-for="(seg, idx) in allocSegments" :key="idx">
+              <div
+                class="allocator-segment"
+                :style="{ flex: seg.percent, background: seg.color }"
+              >
+                <span v-if="seg.percent >= 20" class="allocator-segment-label">{{ seg.percent }}%</span>
+              </div>
+              <div
+                v-if="idx < allocSegments.length - 1"
+                class="allocator-divider"
+                @mousedown.prevent="onDividerMouseDown(idx, $event)"
+              ></div>
+            </template>
           </div>
         </div>
 
-        <div class="drawer-total" :class="{ 'drawer-total-error': Math.abs(drawerTotal - 100) > 0.01 }">
-          总计：{{ drawerTotal.toFixed(1) }}%
-          <span v-if="Math.abs(drawerTotal - 100) > 0.01" class="drawer-total-hint">
-            {{ drawerTotal > 100 ? '超出 100%，请调整' : '不足 100%，请调整' }}
-          </span>
-          <span v-else class="drawer-total-ok">✓ 配比合理</span>
+        <!-- 底部列表 -->
+        <div class="allocator-list">
+          <div
+            v-for="(seg, idx) in allocSegments"
+            :key="idx"
+            class="allocator-row"
+          >
+            <span class="allocator-dot" :style="{ background: seg.color }"></span>
+            <span class="allocator-name">{{ seg.name }}</span>
+            <div class="allocator-input-wrap">
+              <input
+                class="allocator-input"
+                type="number"
+                :min="0"
+                :max="100"
+                :step="0.1"
+                :value="seg.percent"
+                @input="onPercentInput(idx, $event)"
+              />
+              <span class="allocator-unit">%</span>
+            </div>
+            <span class="allocator-value">¥{{ formatNumber(seg.value) }}</span>
+          </div>
+        </div>
+
+        <!-- 仅在总和不为 100% 时提示 -->
+        <div v-if="Math.abs(allocTotal - 100) > 0.01" class="allocator-warning">
+          ⚠️ 当前配比总和为 {{ allocTotal.toFixed(1) }}%，{{ allocTotal > 100 ? '超出 100%，请调整' : '不足 100%，请调整' }}
         </div>
       </div>
+
       <template #footer>
-        <div class="drawer-footer">
-          <button class="btn" @click="showAdjustDrawer = false">取消</button>
+        <div class="allocator-footer">
+          <button class="btn" @click="showAllocator = false">取消</button>
           <button
             class="btn btn-primary"
-            @click="saveAdjustRatios"
-            :disabled="adjustRatioSaving || Math.abs(drawerTotal - 100) > 0.01"
+            @click="saveAllocatorRatios"
+            :disabled="allocatorSaving || Math.abs(allocTotal - 100) > 0.01"
           >
-            {{ adjustRatioSaving ? '保存中…' : '保存' }}
+            {{ allocatorSaving ? '保存中…' : '保存' }}
           </button>
         </div>
       </template>
-    </el-drawer>
+    </el-dialog>
   </div>
 </template>
 
@@ -698,12 +718,10 @@ const renameLoading = ref(false)
 const pieChartRef = ref<HTMLDivElement | null>(null)
 let pieChartInstance: any = null
 
-// 调整比例抽屉
-const showAdjustDrawer = ref(false)
-const drawerRatios = ref<number[]>([])
-const adjustRatioSaving = ref(false)
+// 资产分配器
+const showAllocator = ref(false)
 
-const dotColors = ['blue', 'gold', 'green', 'purple']
+const dotColors = ['blue', 'green', 'yellow', 'red', 'cyan', 'purple', 'orange', 'teal']
 
 // ── Computed ──
 const lastSync = computed(() => {
@@ -771,10 +789,6 @@ const rebalanceOps = ref<RebalanceOp[]>([])
 const rebalanceRemainder = ref(0)
 const rebalanceNote = ref('')
 const hasLoadedRebalance = ref(false)
-
-const drawerTotal = computed(() => {
-  return drawerRatios.value.reduce((sum, r) => sum + r, 0)
-})
 
 // ── Helper functions ──
 function formatNumber(n: number | null | undefined): string {
@@ -1125,32 +1139,161 @@ async function confirmEditAsset() {
   }
 }
 
-// ── Adjust Ratio Drawer ──
-function openAdjustRatioDrawer() {
-  // 初始化 slider 值为当前各资产的目标配比（百分比）
-  drawerRatios.value = portfolio.assets.map(a => Math.round(a.targetRatio * 1000) / 10)
-  showAdjustDrawer.value = true
+// ── 资产分配器 ──
+
+interface AllocSegment {
+  allocationId?: string
+  name: string
+  percent: number
+  value: number
+  color: string
 }
 
-async function saveAdjustRatios() {
-  adjustRatioSaving.value = true
+const allocBarRef = ref<HTMLDivElement | null>(null)
+const allocSegments = ref<AllocSegment[]>([])
+const allocatorSaving = ref(false)
+let allocDraggingIdx = -1
+let allocBarRect: DOMRect | null = null
+
+const allocTotal = computed(() =>
+  allocSegments.value.reduce((s, seg) => s + seg.percent, 0)
+)
+
+function openAdjustRatioDrawer() {
+  const colors = assetPieColors
+  allocSegments.value = portfolio.assets.map((a, idx) => ({
+    allocationId: (a as any).allocationId as string,
+    name: a.name,
+    color: colors[idx % colors.length],
+    percent: Math.round(a.targetRatio * 1000) / 10,
+    value: a.marketValue || 0,
+  }))
+  normalizeAllocPercent(0)
+  showAllocator.value = true
+}
+
+// 标准化：以第 skip 个资产为调节池，使总和 = 100
+function normalizeAllocPercent(skip: number) {
+  const segs = allocSegments.value
+  const total = segs.reduce((s, seg) => s + seg.percent, 0)
+  if (Math.abs(total - 100) < 0.001) return
+  // 将差值从非 skip 的资产中分摊
+  const others = segs.filter((_, i) => i !== skip)
+  const clamp = (v: number) => Math.max(0, Math.round(v * 10) / 10)
+  if (others.length === 0) {
+    segs[skip].percent = 100
+    return
+  }
+  const diff = 100 - total
+  let remaining = diff
+  for (let i = 0; i < segs.length && Math.abs(remaining) > 0.001; i++) {
+    if (i === skip) continue
+    const share = clamp(diff / others.length)
+    const newVal = clamp(segs[i].percent + (remaining > 0 ? Math.min(share, remaining) : Math.max(-share, remaining)))
+    remaining -= (newVal - segs[i].percent)
+    segs[i].percent = newVal
+  }
+  segs[skip].percent = clamp(segs[skip].percent + remaining)
+}
+
+// ── 拖拽分割线 ──
+function onDividerMouseDown(idx: number, e: MouseEvent) {
+  allocDraggingIdx = idx
+  allocBarRect = (allocBarRef.value as HTMLElement).getBoundingClientRect()
+  document.addEventListener('mousemove', onDividerMouseMove)
+  document.addEventListener('mouseup', onDividerMouseUp)
+  e.preventDefault()
+}
+
+function snapValue(val: number): number {
+  const to1 = Math.round(val)
+  if (Math.abs(val - to1) <= 0.25) return to1
+  return val
+}
+
+function onDividerMouseMove(e: MouseEvent) {
+  if (allocDraggingIdx < 0 || !allocBarRect) return
+  const rect = allocBarRect
+  const x = e.clientX - rect.left
+  const pct = Math.max(0, Math.min(100, (x / rect.width) * 100))
+
+  const segs = allocSegments.value
+  const i = allocDraggingIdx
+
+  const leftSum = segs.slice(0, i).reduce((s, seg) => s + seg.percent, 0)
+  const rawLeft = Math.max(0, Math.round((pct - leftSum) * 10) / 10)
+  const snappedLeft = snapValue(rawLeft)
+
+  const othersSum = 100 - segs[i].percent - segs[i + 1].percent
+  const newRight = Math.max(0, Math.round((100 - othersSum - snappedLeft) * 10) / 10)
+
+  if (snappedLeft >= 0 && newRight >= 0) {
+    segs[i].percent = snappedLeft
+    segs[i + 1].percent = newRight
+  }
+}
+
+function onDividerMouseUp() {
+  allocDraggingIdx = -1
+  allocBarRect = null
+  document.removeEventListener('mousemove', onDividerMouseMove)
+  document.removeEventListener('mouseup', onDividerMouseUp)
+}
+
+// ── 手动输入百分比 ──
+function onPercentInput(idx: number, e: Event) {
+  const raw = (e.target as HTMLInputElement).value
+  if (raw === '' || raw === '-') return
+  const val = parseFloat(raw)
+  if (isNaN(val)) return
+
+  const segs = allocSegments.value
+  const old = segs[idx].percent
+  const clamped = Math.max(0, Math.min(100, Math.round(val * 10) / 10))
+  segs[idx].percent = clamped
+
+  // 此消彼长：差值从其他资产分摊
+  const diff = old - clamped
+  const others = segs.filter((_, i) => i !== idx)
+  if (others.length === 0) return
+
+  let remaining = diff
+  for (let i = 0; i < segs.length && Math.abs(remaining) > 0.001; i++) {
+    if (i === idx) continue
+    const share = remaining / segs.filter((_, j) => j !== idx && segs[j].percent + (remaining > 0 ? 1 : -1) >= 0).length
+    // 简化：逐个消化
+    if (remaining > 0) {
+      const take = Math.min(remaining, segs[i].percent)
+      segs[i].percent = Math.round((segs[i].percent - take) * 10) / 10
+      remaining -= take
+    } else {
+      const give = Math.min(-remaining, 100 - segs[i].percent)
+      segs[i].percent = Math.round((segs[i].percent + give) * 10) / 10
+      remaining += give
+    }
+  }
+  normalizeAllocPercent(idx)
+}
+
+async function saveAllocatorRatios() {
+  allocatorSaving.value = true
   try {
     const assets = portfolio.assets
-    // 逐个保存配比
-    for (let i = 0; i < assets.length; i++) {
-      const ratio = (drawerRatios.value[i] || 0) / 100
+    for (let i = 0; i < allocSegments.value.length; i++) {
+      const seg = allocSegments.value[i]
+      const ratio = (seg.percent || 0) / 100
       await axios.put(
-        `/api/portfolio/${encodeURIComponent(currentPortfolioName.value)}/allocation/${assets[i].allocationId}`,
+        `/api/portfolio/${encodeURIComponent(currentPortfolioName.value)}/allocation/${(seg as any).allocationId}`,
         { targetRatio: ratio }
       )
     }
     ElMessage.success('配比已保存')
-    showAdjustDrawer.value = false
+    showAllocator.value = false
     await fetchPortfolio()
   } catch (e: any) {
     ElMessage.error('保存配比失败：' + (e.response?.data?.message || e.message))
   } finally {
-    adjustRatioSaving.value = false
+    allocatorSaving.value = false
   }
 }
 
@@ -1290,59 +1433,107 @@ function initChart() {
 
   chartInstance = echarts.init(chartRef.value)
   const isDark = getTheme()
-  const accent = isDark ? '#6b73ff' : '#494fdf'
-  const lineColor = isDark ? '#2a2d30' : '#e8eaed'
-  const gridColor = isDark ? '#2a2d30' : '#f0f1f3'
+
+  const accent = isDark ? '#7B93E0' : '#5470C6'
+  const accentGlow = isDark ? 'rgba(123,147,224,0.25)' : 'rgba(84,112,198,0.18)'
+  const accentFade = isDark ? 'rgba(123,147,224,0.02)' : 'rgba(84,112,198,0.01)'
+  const tickColor = isDark ? '#5A5F66' : '#b0b7c0'
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
+  const tooltipBg = isDark ? '#1F2227' : '#fff'
+  const tooltipBorder = isDark ? '#363940' : '#e8eaed'
+
+  const navMin = Math.min(...navValues.value)
+  const navMax = Math.max(...navValues.value)
+  const navRange = navMax - navMin || 1
+  const yMin = Math.floor((navMin - navRange * 0.1) / 10000) * 10000
+  const yMax = Math.ceil((navMax + navRange * 0.1) / 10000) * 10000
 
   chartInstance.setOption({
     tooltip: {
       trigger: 'axis',
+      backgroundColor: tooltipBg,
+      borderColor: tooltipBorder,
+      borderWidth: 1,
+      textStyle: { fontSize: 12, color: isDark ? '#e8eaed' : '#191c1f' },
+      axisPointer: {
+        type: 'cross',
+        crossStyle: { color: isDark ? '#5A5F66' : '#b0b7c0' },
+        label: {
+          backgroundColor: accent,
+          color: '#fff',
+          fontSize: 11,
+          formatter: (p: any) => {
+            if (p.axisDimension === 'y') return '¥' + (p.value as number / 10000).toFixed(1) + '万'
+            return p.value
+          },
+        },
+      },
       valueFormatter: (value: number) => '¥' + value.toLocaleString(),
     },
-    grid: { left: 24, right: 24, top: 16, bottom: 32 },
+    grid: { left: 16, right: 24, top: 24, bottom: 36 },
     xAxis: {
       type: 'category',
       data: navDates.value,
-      axisLabel: { interval: Math.max(1, Math.floor(navDates.value.length / 7) - 1), fontSize: 11, color: '#8d969e' },
-      axisLine: { lineStyle: { color: lineColor } },
+      axisLabel: {
+        interval: Math.max(1, Math.floor(navDates.value.length / 7) - 1),
+        fontSize: 11,
+        color: tickColor,
+        margin: 10,
+      },
+      axisLine: { lineStyle: { color: gridColor } },
       axisTick: { show: false },
     },
     yAxis: {
       type: 'value',
+      min: yMin,
+      max: yMax,
+      splitNumber: 4,
       axisLabel: {
         formatter: (v: number) => '¥' + (v / 10000).toFixed(0) + '万',
         fontSize: 11,
-        color: '#8d969e',
+        color: tickColor,
+        margin: 10,
       },
       splitLine: { lineStyle: { color: gridColor, type: 'dashed' } },
+      axisLine: { show: false },
     },
     series: [
       {
         type: 'line',
         data: navValues.value,
         smooth: true,
-        symbol: 'none',
-        lineStyle: { color: accent, width: 2.5 },
+        symbol: 'circle',
+        symbolSize: 5,
+        showSymbol: false,
+        emphasis: { focus: 'series' },
+        lineStyle: { color: accent, width: 2.5, cap: 'round' },
+        itemStyle: {
+          color: accent,
+          borderColor: isDark ? '#0d0f10' : '#fff',
+          borderWidth: 2,
+        },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: isDark ? 'rgba(107,115,255,0.12)' : 'rgba(73,79,223,0.08)' },
-            { offset: 1, color: isDark ? 'rgba(107,115,255,0.02)' : 'rgba(73,79,223,0.01)' },
+            { offset: 0, color: accentGlow },
+            { offset: 1, color: accentFade },
           ]),
         },
       },
     ],
+    animationDuration: 800,
+    animationEasing: 'cubicOut',
   })
 }
 
 // ── Pie Chart ──
-const assetPieColors = ['#409EFF', '#E6A23C', '#67C23A', '#9B59B6', '#909399']
-const assetPieColorsTransparent = [
-  'rgba(64,158,255,0.35)',
-  'rgba(230,162,60,0.35)',
-  'rgba(103,194,58,0.35)',
-  'rgba(155,89,182,0.35)',
-  'rgba(144,147,153,0.35)',
-]
+const assetPieColors = ['#5470C6', '#91CC75', '#FAC858', '#EE6666', '#73C0DE', '#9A60B4', '#FC8452', '#3BA272']
+
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
 
 function initPieChart() {
   if (!pieChartRef.value) return
@@ -1361,99 +1552,186 @@ function initPieChart() {
   const assets = portfolio.assets
   if (assets.length === 0) {
     pieChartInstance.setOption({
-      title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { fontSize: 14, color: '#8d969e' } }
+      title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { fontSize: 14, color: '#999' } }
     })
     return
   }
 
-  // 内环数据：目标配比 (target ratio)
-  const targetData = assets.map((a, idx) => ({
-    name: a.name,
-    value: Math.round(a.targetRatio * 10000) / 100,
-    itemStyle: {
-      color: assetPieColorsTransparent[idx % assetPieColorsTransparent.length],
-      borderColor: assetPieColors[idx % assetPieColors.length],
-      borderWidth: 2,
-    },
-  }))
-
-  // 外环数据：实际配比 (actual ratio)。如果没有价格数据，外环同内环，灰色
-  const hasPrice = assets.some(a => a.price != null)
-  const actualData = assets.map((a, idx) => ({
-    name: a.name,
-    value: hasPrice ? Math.round(a.actualRatio * 10000) / 100 : Math.round(a.targetRatio * 10000) / 100,
-    itemStyle: {
-      color: hasPrice ? assetPieColors[idx % assetPieColors.length] : '#909399',
-      borderColor: hasPrice ? 'rgba(255,255,255,0.8)' : '#909399',
-      borderWidth: 2,
-      borderRadius: 4,
-    },
-  }))
-
   const isDark = getTheme()
+  const hasPrice = assets.some(a => a.price != null)
+
+  // 内环：目标配比 — 过滤掉比例为 0 的资产
+  const targetData = assets
+    .map((a, idx) => {
+      const val = Math.round(a.targetRatio * 10000) / 100
+      const solidColor = assetPieColors[idx % assetPieColors.length]
+      return {
+        name: a.name,
+        value: val > 0 ? val : null as any,
+        itemStyle: {
+          color: hexToRgba(solidColor, 0.25),
+          borderColor: '#fff',
+          borderWidth: 2,
+          borderRadius: 10,
+        },
+      }
+    })
+    .filter(d => d.value != null)
+
+  // 外环：实际配比（实色）
+  const actualData = assets
+    .map((a, idx) => {
+      const val = hasPrice
+        ? Math.round(a.actualRatio * 10000) / 100
+        : Math.round(a.targetRatio * 10000) / 100
+      return {
+        name: a.name,
+        value: val > 0 ? val : null as any,
+        itemStyle: {
+          color: hasPrice ? assetPieColors[idx % assetPieColors.length] : '#b0b0b0',
+          borderColor: '#fff',
+          borderWidth: 2,
+          borderRadius: 10,
+        },
+      }
+    })
+    .filter(d => d.value != null)
 
   pieChartInstance.setOption({
     tooltip: {
       trigger: 'item',
+      backgroundColor: '#fff',
+      borderColor: '#e8e8e8',
+      borderWidth: 1,
+      padding: [10, 14],
+      textStyle: { fontSize: 12, color: '#333' },
       formatter: (params: any) => {
-        const seriesName = params.seriesName
-        return `${seriesName}<br/>${params.name}: ${params.value}%`
+        const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${params.color};margin-right:6px;"></span>`
+        return `${dot}${params.seriesName}<br/>&nbsp;&nbsp;${params.name}: <strong>${params.value}%</strong>`
       },
     },
     legend: {
-      bottom: 0,
-      data: assets.map(a => a.name),
-      textStyle: { fontSize: 11, color: isDark ? '#8d969e' : '#8d969e' },
+      type: 'scroll',
+      bottom: 8,
+      data: Array.from(new Set([...targetData, ...actualData].map(d => d.name))),
+      textStyle: { fontSize: 12, color: '#333', fontWeight: 500 },
       itemWidth: 10,
       itemHeight: 10,
-      itemGap: 14,
+      itemGap: 20,
+      icon: 'circle',
+      selectedMode: true,
+      inactiveColor: '#ccc',
     },
     series: [
       {
         name: '目标配比',
         type: 'pie',
-        radius: ['45%', '60%'],
+        radius: ['42%', '58%'],
         center: ['50%', '45%'],
         avoidLabelOverlap: false,
+        minAngle: 3,
+        padAngle: 1,
         label: { show: false },
-        emphasis: { label: { show: false } },
+        emphasis: {
+          scale: false,
+          label: { show: false },
+        },
         labelLine: { show: false },
         data: targetData,
-        itemStyle: {
-          borderRadius: 4,
-          borderColor: '#fff',
-          borderWidth: 1,
-        },
+        animationType: 'scale',
+        animationEasing: 'elasticOut',
+        animationDuration: 600,
+        animationDelay: (idx: number) => idx * 60,
       },
       {
         name: '实际配比',
         type: 'pie',
-        radius: ['65%', '80%'],
+        radius: ['64%', '82%'],
         center: ['50%', '45%'],
-        avoidLabelOverlap: false,
-        label: { show: false },
-        emphasis: { label: { show: false } },
-        labelLine: { show: false },
-        data: actualData,
-        itemStyle: {
-          borderRadius: 4,
-          borderColor: '#fff',
-          borderWidth: 1,
+        avoidLabelOverlap: true,
+        minAngle: 3,
+        padAngle: 1,
+        label: {
+          show: true,
+          position: 'outside',
+          formatter: (p: any) => `{name|${p.name}}\n{val|${p.value}%}`,
+          rich: {
+            name: {
+              fontSize: 12,
+              fontWeight: 'bold',
+              color: '#333',
+              lineHeight: 18,
+            },
+            val: {
+              fontSize: 11,
+              color: '#999',
+              lineHeight: 16,
+            },
+          },
         },
+        labelLine: {
+          length: 24,
+          length2: 32,
+          lineStyle: { color: '#d0d0d0', width: 1 },
+          smooth: true,
+        },
+        emphasis: {
+          scale: true,
+          scaleSize: 8,
+          focus: 'self',
+          label: {
+            show: true,
+            fontSize: 14,
+            fontWeight: 'bold',
+          },
+        },
+        data: actualData,
+        animationType: 'scale',
+        animationEasing: 'elasticOut',
+        animationDuration: 700,
+        animationDelay: (idx: number) => idx * 80 + 200,
       },
     ],
-    graphic: {
-      type: 'text',
-      left: 'center',
-      top: '40%',
-      style: {
-        text: currentPortfolioName.value,
-        textAlign: 'center',
-        fill: isDark ? '#e8eaed' : '#191c1f',
-        fontSize: 14,
-        fontWeight: 'bold',
-      },
-    },
+    graphic: hasPrice
+      ? [
+          {
+            type: 'text',
+            left: 'center',
+            top: '38%',
+            style: {
+              text: currentPortfolioName.value,
+              textAlign: 'center',
+              fill: '#333',
+              fontSize: 16,
+              fontWeight: 'bold',
+            },
+          },
+          {
+            type: 'text',
+            left: 'center',
+            top: '48%',
+            style: {
+              text: '内环目标 · 外环实际',
+              textAlign: 'center',
+              fill: '#999',
+              fontSize: 11,
+            },
+          },
+        ]
+      : [
+          {
+            type: 'text',
+            left: 'center',
+            top: '42%',
+            style: {
+              text: currentPortfolioName.value,
+              textAlign: 'center',
+              fill: '#333',
+              fontSize: 16,
+              fontWeight: 'bold',
+            },
+          },
+        ],
   })
 }
 
@@ -1640,7 +1918,7 @@ watch([navDates, navValues], () => {
   --card: #ffffff;
   --text-primary: #191c1f;
   --text-secondary: #8d969e;
-  --accent: #494fdf;
+  --accent: #5470C6;
   --success: #00a87e;
   --warning: #ec7e00;
   --danger: #e5484d;
@@ -1661,7 +1939,7 @@ html.dark .portfolio-page {
   --card: #1a1d20;
   --text-primary: #e8eaed;
   --text-secondary: #8d969e;
-  --accent: #6b73ff;
+  --accent: #7B93E0;
   --border: #2a2d30;
 }
 html.dark .sidebar-card .sc-value {
@@ -1914,10 +2192,15 @@ html.dark .allocation-preview {
   min-width: 0;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 20px 20px 12px 20px;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+  transition: box-shadow 0.2s;
+}
+.chart-left:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
 }
 .chart-left .chart-title {
   font-size: 14px;
@@ -1941,10 +2224,11 @@ html.dark .allocation-preview {
 }
 
 .sidebar-networth {
-  background: var(--accent);
-  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent), rgba(84,112,198,0.8));
+  border-radius: 14px;
   padding: 20px 18px;
   color: #fff;
+  box-shadow: 0 2px 8px rgba(84,112,198,0.25);
 }
 .sidebar-networth .sn-label {
   font-size: 11px;
@@ -1975,8 +2259,9 @@ html.dark .allocation-preview {
 .sidebar-card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 .sidebar-card .sc-label {
   font-size: 11px;
@@ -2038,15 +2323,20 @@ html.dark .allocation-preview {
 
 /* ── Pie Chart ── */
 .pie-chart-wrapper {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
+  background: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 20px 16px 8px 16px;
   margin-bottom: 24px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+  transition: box-shadow 0.2s;
+}
+.pie-chart-wrapper:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.05);
 }
 .pie-chart-container {
   width: 100%;
-  height: 360px;
+  height: 400px;
 }
 
 /* ── Edit Icon Button ── */
@@ -2075,8 +2365,8 @@ html.dark .allocation-preview {
 
 /* ── Ratio Warning ── */
 .ratio-warning {
-  background: #fff3e8;
-  border: 1px solid #ffe8cc;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
   border-radius: 8px;
   padding: 10px 16px;
   font-size: 12px;
@@ -2095,10 +2385,15 @@ html.dark .allocation-preview {
 .asset-card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 18px 20px;
   display: flex;
   flex-direction: column;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.asset-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  border-color: rgba(84,112,198,0.2);
 }
 .asset-card .card-header {
   display: flex;
@@ -2151,7 +2446,7 @@ html.dark .allocation-preview {
   padding: 2px 0;
 }
 .asset-card .card-ratio:hover {
-  background: rgba(73, 79, 223, 0.04);
+  background: rgba(99, 102, 241, 0.05);
 }
 
 /* ── Inline Ratio Edit ── */
@@ -2302,18 +2597,14 @@ html.dark tr.warn-row {
   border-radius: 50%;
   margin-right: 6px;
 }
-.asset-dot.blue {
-  background: var(--accent);
-}
-.asset-dot.gold {
-  background: var(--warning);
-}
-.asset-dot.green {
-  background: var(--success);
-}
-.asset-dot.purple {
-  background: #8b5cf6;
-}
+.asset-dot.blue   { background: #5470C6; }
+.asset-dot.green  { background: #91CC75; }
+.asset-dot.yellow { background: #FAC858; }
+.asset-dot.red    { background: #EE6666; }
+.asset-dot.cyan   { background: #73C0DE; }
+.asset-dot.purple { background: #9A60B4; }
+.asset-dot.orange { background: #FC8452; }
+.asset-dot.teal   { background: #3BA272; }
 
 .asset-code-sub {
   color: var(--text-secondary);
@@ -2722,70 +3013,169 @@ html.dark .code-search-dropdown {
   color: #fff;
 }
 
-/* ── Drawer Styles ── */
-.drawer-body {
-  padding: 0 20px;
+/* ── 资产分配器 ── */
+.allocator-body {
+  padding: 0 4px;
 }
 
-.drawer-asset-row {
+/* 金条 */
+.allocator-bar-wrapper {
+  padding: 0 20px 16px 20px;
+  margin-bottom: 8px;
+}
+.allocator-bar {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 18px;
+  height: 32px;
+  border-radius: 8px;
+  overflow: visible;
+  background: #f0f1f3;
+  gap: 1px;
 }
-
-.drawer-asset-label {
+.allocator-segment {
+  height: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-
-.drawer-asset-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.drawer-asset-code {
-  font-size: 11px;
-  color: var(--text-secondary);
-  background: var(--bg);
-  padding: 1px 6px;
+  justify-content: center;
   border-radius: 4px;
+  transition: flex 0.12s ease;
 }
-
-.drawer-slider-wrap {
-  width: 100%;
-}
-
-.drawer-total {
-  margin-top: 12px;
-  padding: 12px 16px;
-  background: #eafaf4;
-  border-radius: 8px;
-  font-size: 14px;
+.allocator-segment-label {
+  font-size: 11px;
   font-weight: 600;
-  color: var(--success);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  user-select: none;
+  white-space: nowrap;
+}
+.allocator-segment:first-child {
+  border-radius: 8px 0 0 8px;
+}
+.allocator-segment:last-child {
+  border-radius: 0 8px 8px 0;
 }
 
-.drawer-total-error {
-  background: #fff3e8;
-  color: var(--warning);
+/* 分割线 — 0 宽度 flex 子元素，突出杆样式 */
+.allocator-divider {
+  width: 0;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+.allocator-divider::before {
+  /* 透明拖拽热区 */
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: -12px;
+  width: 20px;
+  height: 56px;
+  cursor: col-resize;
+  z-index: 1;
+}
+.allocator-divider::after {
+  /* 突出杆 */
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: -8px;
+  width: 6px;
+  height: 48px;
+  background: #fff;
+  border: 1.5px solid #d0d5dd;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 2;
+  transition: background 0.15s, border-color 0.15s;
+}
+.allocator-divider:hover::after {
+  background: #9ca3af;
+  border-color: #9ca3af;
+}
+.allocator-divider:active::after {
+  background: #6b7280;
+  border-color: #6b7280;
 }
 
-.drawer-total-hint {
+/* 底部列表 */
+.allocator-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.allocator-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.allocator-row:hover {
+  background: #f0f2f5;
+}
+.allocator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.allocator-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.allocator-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.allocator-input {
+  width: 64px;
+  padding: 4px 6px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  font-family: inherit;
+  outline: none;
+  color: #333;
+  transition: border-color 0.15s;
+}
+.allocator-input:focus {
+  border-color: #5470C6;
+  box-shadow: 0 0 0 2px rgba(84,112,198,0.12);
+}
+.allocator-unit {
   font-size: 12px;
-  font-weight: 400;
-  margin-left: 8px;
+  color: #999;
 }
-
-.drawer-total-ok {
+.allocator-value {
   font-size: 12px;
-  font-weight: 400;
-  margin-left: 8px;
+  color: #999;
+  min-width: 80px;
+  text-align: right;
 }
 
-.drawer-footer {
+/* 配比偏离警告 */
+.allocator-warning {
+  padding: 10px 14px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #c2410c;
+}
+
+.allocator-footer {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
