@@ -1,13 +1,14 @@
 package site.hanabii.fireworks.domain.auth
 
-import java.time.Instant
+import java.time.LocalDateTime
 
 /**
  * Web 登录账号领域实体。
  */
 data class Account(
-    val id: Long? = null,
+    val id: Long?,
     val username: String,
     val passwordHash: String,
-    val createdAt: Instant = Instant.now()
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+    val updatedAt: LocalDateTime = LocalDateTime.now()
 )

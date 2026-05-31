@@ -18,7 +18,7 @@ class AuthService(
     fun register(username: String, password: String): Account {
         require(username.isNotBlank()) { "Username must not be blank" }
         require(password.isNotBlank()) { "Password must not be blank" }
-        if (accountRepository.existsByUsername(username)) {
+        if (accountRepository.findByUsername(username) != null) {
             throw AppException(
                 code = ErrorCode.ACCOUNT_EXISTS,
                 status = org.springframework.http.HttpStatus.CONFLICT,
@@ -26,7 +26,7 @@ class AuthService(
             )
         }
         val hash = passwordEncoder.encode(password) ?: throw IllegalStateException("Failed to hash password")
-        return accountRepository.save(Account(username = username, passwordHash = hash))
+        return accountRepository.save(Account(id = null, username = username, passwordHash = hash))
     }
 
     fun authenticate(username: String, password: String): Account? {

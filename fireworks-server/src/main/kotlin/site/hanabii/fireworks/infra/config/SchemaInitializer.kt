@@ -6,17 +6,17 @@ import org.springframework.context.event.EventListener
 import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
 import site.hanabii.fireworks.infra.UserDO
-import site.hanabii.fireworks.infra.auth.AccountDO
-import site.hanabii.fireworks.infra.vault.PasswordEntryDO
+import site.hanabii.fireworks.infra.auth.AccountTable
+import site.hanabii.fireworks.infra.family.FamilyLineageDO
 import site.hanabii.fireworks.infra.family.FamilyPersonDO
 import site.hanabii.fireworks.infra.family.FamilyTreeDO
 import site.hanabii.fireworks.infra.family.PersonSpouseDO
-import site.hanabii.fireworks.infra.family.FamilyLineageDO
-import site.hanabii.fireworks.infra.vault.VaultConfigDO
 import site.hanabii.fireworks.infra.portfolio.PortfolioDO
 import site.hanabii.fireworks.infra.portfolio.PortfolioHoldingDO
-import site.hanabii.fireworks.infra.portfolio.StockHistoryDO
 import site.hanabii.fireworks.infra.portfolio.PortfolioSnapshotDO
+import site.hanabii.fireworks.infra.portfolio.StockHistoryDO
+import site.hanabii.fireworks.infra.vault.PasswordEntryDO
+import site.hanabii.fireworks.infra.vault.VaultConfigDO
 import javax.sql.DataSource
 
 /**
@@ -34,11 +34,11 @@ class SchemaInitializer(
         if (!enabled) return
         dataSource.connection.use { conn ->
             conn.createStatement().use { stmt ->
+                stmt.execute(FamilyPersonDO.DDL.trimIndent())
                 stmt.execute(UserDO.DDL.trimIndent())
                 stmt.execute(VaultConfigDO.DDL.trimIndent())
                 stmt.execute(PasswordEntryDO.DDL.trimIndent())
-                stmt.execute(AccountDO.DDL.trimIndent())
-                stmt.execute(FamilyPersonDO.DDL.trimIndent())
+                stmt.execute(AccountTable.DDL.trimIndent())
                 stmt.execute(FamilyTreeDO.DDL.trimIndent())
                 stmt.execute(PersonSpouseDO.DDL.trimIndent())
                 stmt.execute(FamilyLineageDO.DDL.trimIndent())
