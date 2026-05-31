@@ -1,4 +1,4 @@
-package site.hanabii.fireworks.infra.config
+package site.hanabii.fireworks.infra._config
 
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.graphql.server.WebGraphQlInterceptor

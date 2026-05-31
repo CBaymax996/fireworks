@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory
 import site.hanabii.fireworks.app.AppException
 import site.hanabii.fireworks.app.ErrorCode
 import site.hanabii.fireworks.domain.portfolio.Portfolio
-import site.hanabii.fireworks.infra.config.TraceIdFilter
+import site.hanabii.fireworks.infra._config.TraceIdFilter
 import org.springframework.http.HttpStatus
 import jakarta.servlet.http.HttpServletRequest
 

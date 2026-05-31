@@ -1,4 +1,4 @@
-package site.hanabii.fireworks.infra.config
+package site.hanabii.fireworks.infra._config
 
 import com.expediagroup.graphql.generator.SchemaGenerator
 import com.expediagroup.graphql.generator.SchemaGeneratorConfig
@@ -18,8 +18,6 @@ import site.hanabii.fireworks.app.graphql.FamilyTreeMutation
 import site.hanabii.fireworks.app.graphql.FamilyTreeQuery
 import site.hanabii.fireworks.app.graphql.PortfolioMutation
 import site.hanabii.fireworks.app.graphql.PortfolioQuery
-import site.hanabii.fireworks.app.graphql.UserMutation
-import site.hanabii.fireworks.app.graphql.UserQuery
 import site.hanabii.fireworks.app.graphql.VaultMutation
 import site.hanabii.fireworks.app.graphql.VaultQuery
 import kotlin.reflect.KType
@@ -39,13 +37,12 @@ class GraphQLConfig(
     private val vaultQuery: VaultQuery,
     private val portfolioQuery: PortfolioQuery,
     private val familyTreeQuery: FamilyTreeQuery,
-    private val userQuery: UserQuery,
     // Mutation resolver beans
     private val authMutation: AuthMutation,
     private val vaultMutation: VaultMutation,
     private val portfolioMutation: PortfolioMutation,
     private val familyTreeMutation: FamilyTreeMutation,
-    private val userMutation: UserMutation
+
 ) {
     /**
      * 用 schema-generator 扫描所有 resolver bean 生成 GraphQLSchema。
@@ -61,14 +58,12 @@ class GraphQLConfig(
             TopLevelObject(vaultQuery),
             TopLevelObject(portfolioQuery),
             TopLevelObject(familyTreeQuery),
-            TopLevelObject(userQuery)
         )
         val mutations = listOf(
             TopLevelObject(authMutation),
             TopLevelObject(vaultMutation),
             TopLevelObject(portfolioMutation),
             TopLevelObject(familyTreeMutation),
-            TopLevelObject(userMutation)
         )
         val config = SchemaGeneratorConfig(
             supportedPackages = listOf("site.hanabii.fireworks"),

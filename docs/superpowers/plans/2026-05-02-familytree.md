@@ -849,7 +849,7 @@ import site.hanabii.fireworks.infra.family.FamilyLineageDO
 
 完整修改后的 `SchemaInitializer.kt`：
 ```kotlin
-package site.hanabii.fireworks.infra.config
+package site.hanabii.fireworks.infra._config
 
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.context.event.ApplicationReadyEvent

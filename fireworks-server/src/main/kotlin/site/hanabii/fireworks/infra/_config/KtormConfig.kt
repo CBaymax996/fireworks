@@ -1,4 +1,4 @@
-package site.hanabii.fireworks.infra.config
+package site.hanabii.fireworks.infra._config
 
 import org.ktorm.database.Database
 import org.ktorm.support.sqlite.SQLiteDialect

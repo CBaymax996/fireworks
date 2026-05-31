@@ -8,7 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
-import site.hanabii.fireworks.infra.config.TraceIdFilter
+import site.hanabii.fireworks.infra._config.TraceIdFilter
 import java.time.Instant
 
 @RestControllerAdvice

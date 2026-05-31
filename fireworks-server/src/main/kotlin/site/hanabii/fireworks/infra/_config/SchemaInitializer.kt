@@ -1,11 +1,10 @@
-package site.hanabii.fireworks.infra.config
+package site.hanabii.fireworks.infra._config
 
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
 import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
-import site.hanabii.fireworks.infra.UserDO
 import site.hanabii.fireworks.infra.auth.AccountTable
 import site.hanabii.fireworks.infra.family.FamilyLineageDO
 import site.hanabii.fireworks.infra.family.FamilyPersonDO
@@ -35,7 +34,6 @@ class SchemaInitializer(
         dataSource.connection.use { conn ->
             conn.createStatement().use { stmt ->
                 stmt.execute(FamilyPersonDO.DDL.trimIndent())
-                stmt.execute(UserDO.DDL.trimIndent())
                 stmt.execute(VaultConfigDO.DDL.trimIndent())
                 stmt.execute(PasswordEntryDO.DDL.trimIndent())
                 stmt.execute(AccountTable.DDL.trimIndent())

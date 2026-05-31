@@ -1,4 +1,4 @@
-package site.hanabii.fireworks.infra.config
+package site.hanabii.fireworks.infra._config
 
 import jakarta.servlet.Filter
 import jakarta.servlet.FilterChain
