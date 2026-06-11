@@ -15,18 +15,18 @@ CBaymax 的个人项目。
 
 ## 启动
 
-### 生产模式
-
-```bash
-./run                    # 启动全部模块
-./run -backend=fireworks-server   # 仅启动后端
-./run -frontend=fireworks-web     # 仅启动前端
-```
-
 ### 开发模式
 
 ```bash
-./runDev                 # 启动全部模块（前端热部署）
-./runDev -backend=fireworks-server
-./runDev -frontend=fireworks-web
+ # 后端 8080 + 前端 5173 (热部署)
+./gradlew fireworksRun -Penv=dev   
+ # 仅启动后端 (8080)
+./gradlew :fireworks-server:bootRun
+```
+
+### 生产模式
+
+```bash
+./gradlew fireworksRun              # 打包后端 + 前端
+./gradlew :fireworks-server:bootJar # 仅打包后端
 ```
