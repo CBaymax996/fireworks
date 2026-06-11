@@ -4,7 +4,6 @@ import com.expediagroup.graphql.generator.annotations.GraphQLDescription
 import org.springframework.stereotype.Component
 import site.hanabii.fireworks.app.portfolio.PortfolioService
 import site.hanabii.fireworks.app.portfolio.RebalanceExecuteRequest
-import site.hanabii.fireworks.domain.portfolio.Portfolio
 
 /**
  * 投资组合变更 — GraphQL Mutation resolver。
@@ -77,7 +76,7 @@ class PortfolioMutation(
 
     @GraphQLDescription("删除资产配比")
     fun deleteAllocation(name: String, allocationId: Long): Boolean {
-        portfolioService.deleteAllocation(name, allocationId)
+        portfolioService.deleteAllocation(allocationId)
         return true
     }
 

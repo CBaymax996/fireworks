@@ -127,7 +127,7 @@ class PortfolioService(
         // 总投入 = 所有持仓 shares × price（对于 CASH，price=1.0, shares=金额）
         val totalInvested = holdings.sumOf { (_, holding) ->
             if (holding != null && holding.currentPrice != null) {
-                holding.currentShares * holding.currentPrice!!
+                holding.currentShares * holding.currentPrice
             } else 0.0
         }
 
@@ -187,7 +187,7 @@ class PortfolioService(
     /** 计算总净值：所有有价格的持仓 shares × price 之和 */
     private fun calculateNav(holdings: List<Pair<Portfolio, PortfolioHolding?>>): Double {
         return holdings.sumOf { (_, holding) ->
-            if (holding?.currentPrice != null) holding.currentShares * holding.currentPrice!! else 0.0
+            if (holding?.currentPrice != null) holding.currentShares * holding.currentPrice else 0.0
         }
     }
 
@@ -241,12 +241,6 @@ class PortfolioService(
 
     /** 修改配比（校验总和 100%） */
     fun updateAllocation(portfolioName: String, allocationId: Long, targetRatio: Double) {
-        val alloc = portfolioRepository.findPortfolioById(allocationId)
-            ?: throw AppException(
-                code = ErrorCode.ENTRY_NOT_FOUND,
-                status = HttpStatus.NOT_FOUND,
-                message = "配比不存在: $allocationId"
-            )
 
         // 校验配比总和不超过 100%
         val allAllocs = portfolioRepository.findPortfolioByName(portfolioName)
@@ -263,7 +257,7 @@ class PortfolioService(
     }
 
     /** 批量修改配比（一次性校验总和） */
-    fun batchUpdateAllocations(portfolioName: String, items: List<Pair<Long, Double>>) {
+    fun batchUpdateAllocations(items: List<Pair<Long, Double>>) {
         val totalRatio = items.sumOf { it.second }
         if (totalRatio > 1.001) {
             throw AppException(
@@ -285,13 +279,7 @@ class PortfolioService(
     }
 
     /** 删除资产配比及对应持仓 */
-    fun deleteAllocation(portfolioName: String, allocationId: Long) {
-        val alloc = portfolioRepository.findPortfolioById(allocationId)
-            ?: throw AppException(
-                code = ErrorCode.ENTRY_NOT_FOUND,
-                status = HttpStatus.NOT_FOUND,
-                message = "配比不存在: $allocationId"
-            )
+    fun deleteAllocation(allocationId: Long) {
         portfolioRepository.deleteHoldingByAllocationId(allocationId)
         portfolioRepository.deletePortfolio(allocationId)
     }
@@ -353,14 +341,7 @@ class PortfolioService(
     /** 出金：手动指定卖出资产和股数 */
     fun withdraw(portfolioName: String, allocationId: Long, shares: Long) {
         require(shares > 0) { "卖出股数必须大于 0" }
-        require(shares % LOT_SIZE == 0L) { "卖出股数必须是 ${LOT_SIZE} 的整数倍" }
-
-        val alloc = portfolioRepository.findPortfolioById(allocationId)
-            ?: throw AppException(
-                code = ErrorCode.ENTRY_NOT_FOUND,
-                status = HttpStatus.NOT_FOUND,
-                message = "资产不存在: $allocationId"
-            )
+        require(shares % LOT_SIZE == 0L) { "卖出股数必须是 $LOT_SIZE 的整数倍" }
 
         val holding = portfolioRepository.findHoldingByAllocationId(allocationId)
             ?: throw AppException(
@@ -391,8 +372,8 @@ class PortfolioService(
         val holdings = portfolioRepository.findHoldingsByPortfolioName(portfolioName)
         val nav = calculateNav(holdings)
 
-        val pricedHoldings = holdings.filter { (alloc, holding) ->
-            holding?.currentPrice != null && holding.currentPrice!! > 0
+        val pricedHoldings = holdings.filter { (_, holding) ->
+            holding?.currentPrice != null && holding.currentPrice > 0
         }
         if (pricedHoldings.isEmpty()) {
             throw AppException(
@@ -406,7 +387,6 @@ class PortfolioService(
         val nonCashHoldings = pricedHoldings.filter { (alloc, _) -> alloc.assetType != "CASH" }
         val totalTargetRatio = nonCashHoldings.sumOf { (alloc, _) -> alloc.targetRatio }
         val operations = mutableListOf<RebalanceOperation>()
-        val navBefore = nav
 
         for ((alloc, holding) in nonCashHoldings) {
             val price = holding!!.currentPrice!!
@@ -455,8 +435,8 @@ class PortfolioService(
         }
 
         return RebalanceResult(
-            navBefore = roundTo2(navBefore),
-            navAfter = roundTo2(navBefore),  // 预览不改变净值
+            navBefore = roundTo2(nav),
+            navAfter = roundTo2(nav),  // 预览不改变净值
             operations = operations
         )
     }
@@ -565,7 +545,7 @@ class PortfolioService(
                     name = "批量请求失败",
                     price = 0.0,
                     date = LocalDate.now().toString(),
-                    error = e.message ?: "未知错误"
+                    error = e.message
                 ))
             )
         }
@@ -619,7 +599,7 @@ class PortfolioService(
         val holdings = portfolioRepository.findHoldingsByPortfolioName(portfolioName)
         val now = Instant.now()
         for ((alloc, holding) in holdings) {
-            val marketValue = if (holding?.currentPrice != null) holding.currentShares * holding.currentPrice!! else 0.0
+            val marketValue = if (holding?.currentPrice != null) holding.currentShares * holding.currentPrice else 0.0
             val ratio = if (nav > 0) marketValue / nav else 0.0
             portfolioRepository.saveSnapshot(
                 PortfolioSnapshot(
@@ -690,7 +670,7 @@ class PortfolioService(
         for (dayOffset in 59 downTo 0) {
             val snapshotTime = now.minusSeconds(dayOffset.toLong() * 86400)
             val nav = baseNav * (1.0 + dayOffset * 0.0005)  // 每天略微增长
-            for ((alloc, holding) in savedAllocs) {
+            for ((alloc, _) in savedAllocs) {
                 val marketValue = nav * alloc.targetRatio
                 portfolioRepository.saveSnapshot(
                     PortfolioSnapshot(

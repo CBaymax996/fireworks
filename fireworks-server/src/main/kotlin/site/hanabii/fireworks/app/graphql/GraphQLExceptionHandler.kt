@@ -20,7 +20,7 @@ class GraphQLExceptionHandler : DataFetcherExceptionResolver {
         val error: GraphQLError = when (exception) {
             is AppException -> {
                 GraphqlErrorBuilder.newError()
-                    .message(exception.message ?: "Internal error")
+                    .message(exception.message)
                     .errorType(graphql.ErrorType.DataFetchingException)
                     .extensions(
                         mapOf(

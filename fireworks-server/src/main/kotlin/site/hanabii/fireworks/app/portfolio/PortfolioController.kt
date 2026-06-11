@@ -141,7 +141,7 @@ class PortfolioController(
                 logger.info("[$traceId] item: allocationId=$id, targetRatio=$ratio")
                 id to ratio
             }
-            portfolioService.batchUpdateAllocations(name, pairs)
+            portfolioService.batchUpdateAllocations(pairs)
             return mapOf("message" to "配比已批量更新")
         } catch (e: AppException) {
             throw e
@@ -161,7 +161,7 @@ class PortfolioController(
         @PathVariable name: String,
         @PathVariable id: Long
     ): Map<String, String> {
-        portfolioService.deleteAllocation(name, id)
+        portfolioService.deleteAllocation(id)
         return mapOf("message" to "资产已删除")
     }
 
