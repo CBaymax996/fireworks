@@ -22,6 +22,4 @@ tasks.register<Exec>("fireworksRunDev") {
     group = "application"
     workingDir = rootProject.projectDir
     commandLine("gradle/script/run-dev.sh")
-    environment("LANG", "en_US.UTF-8")
-    environment("LC_ALL", "en_US.UTF-8")
 }
