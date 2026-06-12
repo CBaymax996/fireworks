@@ -88,3 +88,13 @@ Database: SQLite with Ktorm ORM, schema auto-initialized on startup (`fireworks.
 - Frontend Vite config allows cloudflared tunnel hosts and proxies `/api` + `/graphql` to localhost:8080
 - Gradle wrapper version: 9.5.1
 - Maven repositories use Aliyun mirrors (China) as primary, Maven Central as fallback
+
+## Git Rules
+
+When AI agent creates commits, it MUST use its own agent name as the author, NOT the user's identity:
+
+```bash
+git commit --author="mimocode <mimocode@users.noreply.github.com>" -m "commit message"
+```
+
+This ensures git history clearly distinguishes between human commits and AI-generated commits.

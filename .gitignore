@@ -38,3 +38,9 @@ src/main/resources/*.db
 
 ### VS Code ###
 .vscode/
+
+### macOS ###
+.DS_Store
+
+### CodeGraph ###
+.codegraph/
